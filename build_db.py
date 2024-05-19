@@ -73,7 +73,7 @@ if __name__ == "__main__":
     for console in ['PSX', 'PS2']:
         counts = dict()
         for ID in db[console]:
-            prefix = ID.split('_')[0].strip()
+            prefix = ID.split('_')[0].strip() + '_'
             if prefix not in counts:
                 counts[prefix] = 0
             counts[prefix] += 1
