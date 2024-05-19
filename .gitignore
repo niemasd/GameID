@@ -1,3 +1,7 @@
+# GameDB files
+*.pkl
+*.pkl.gz
+
 # Game files
 *.bin
 *.cue
