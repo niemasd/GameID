@@ -54,13 +54,14 @@ def load_db(fn):
 def identify_psx(fn, db):
     fn_lower = fn.lower(); fn_lower_strip = fn.lower().rstrip('.gz')
     if fn_lower_strip.endswith('.bin'):
-        if fn_lower.endswith('.gz'):
-            f = gopen(fn, 'rb')
-        else:
-            f = open(fn, 'rb')
-        serial = f.read(0x0000ef06 + 11)[-11:].decode().replace('.','')
+        offset = 0x9340 # BIN SLUS_XXXXX offset
     else:
-        raise NotImplementedError("TODO IMPLEMENT")
+        offset = 0x8478 # ISO SLUS_XXXXX offset
+    if fn_lower.endswith('.gz'):
+        f = gopen(fn, 'rb')
+    else:
+        f = open(fn, 'rb')
+    serial = f.read(offset + 10)[-10:].decode()
     if serial in db['PSX']:
         return db['PSX'][serial]
 
