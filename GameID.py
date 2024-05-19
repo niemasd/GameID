@@ -10,15 +10,9 @@ from pickle import load as pload
 from sys import stderr
 import argparse
 
-# import pycdlib
-try:
-    from pycdlib import PyCdlib
-except:
-    print("Unable to import pycdlib. Install with: pip install pycdlib", file=stderr); exit(1)
-
 # useful constants
 CONSOLES = {'PSX'}
-EXT_ISO = {'bin', 'cue', 'iso'}
+EXT_ISO = {'bin', 'iso'}
 EXT_ALL = EXT_ISO # union all EXT_* sets
 
 # print an error message and exit
@@ -57,13 +51,23 @@ def load_db(fn):
     return db
 
 # identify PSX game
-def identify_psx(fn):
-    return "TODO"
+def identify_psx(fn, db):
+    fn_lower = fn.lower(); fn_lower_strip = fn.lower().rstrip('.gz')
+    if fn_lower_strip.endswith('.bin'):
+        if fn_lower.endswith('.gz'):
+            f = gopen(fn, 'rb')
+        else:
+            f = open(fn, 'rb')
+        serial = f.read(0x0000ef06 + 11)[-11:].decode().replace('.','')
+    else:
+        raise NotImplementedError("TODO IMPLEMENT")
+    if serial in db['PSX']:
+        return db['PSX'][serial]
 
 # identify game
-def identify(fn, console):
+def identify(fn, console, db):
     if console == 'PSX':
-        return identify_psx(fn)
+        return identify_psx(fn, db)
     else:
         error("Invalid console: %s" % console)
 
@@ -71,6 +75,10 @@ def identify(fn, console):
 def main():
     args = parse_args()
     db = load_db(args.database)
+    title = identify(args.input, args.console, db)
+    if title is None:
+        error("Game not found: %s" % args.input)
+    print(title)
 
 # run program
 if __name__ == "__main__":
