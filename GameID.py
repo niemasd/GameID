@@ -4,7 +4,9 @@ GameID: Identify a game using GameDB
 '''
 
 # standard imports
+from gzip import open as gopen
 from os.path import isfile
+from pickle import load as pload
 from sys import stderr
 import argparse
 
@@ -15,6 +17,7 @@ except:
     print("Unable to import pycdlib. Install with: pip install pycdlib", file=stderr); exit(1)
 
 # useful constants
+CONSOLES = {'PSX'}
 EXT_ISO = {'bin', 'cue', 'iso'}
 EXT_ALL = EXT_ISO # union all EXT_* sets
 
@@ -37,14 +40,37 @@ def check_extension(fn):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-i', '--input', required=True, type=str, help="Input Game File")
+    parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(sorted(CONSOLES)))
+    parser.add_argument('-d', '--database', required=True, type=str, help="GameID Database (db.pkl.gz)")
     args = parser.parse_args()
     check_exists(args.input)
     check_extension(args.input)
     return args
 
+# load GameID database
+def load_db(fn):
+    if fn.lower().endswith('.gz'):
+        f = gopen(fn, 'rb')
+    else:
+        f = open(fn, 'rb')
+    db = pload(f); f.close()
+    return db
+
+# identify PSX game
+def identify_psx(fn):
+    return "TODO"
+
+# identify game
+def identify(fn, console):
+    if console == 'PSX':
+        return identify_psx(fn)
+    else:
+        error("Invalid console: %s" % console)
+
 # main program logic
 def main():
     args = parse_args()
+    db = load_db(args.database)
 
 # run program
 if __name__ == "__main__":
