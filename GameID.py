@@ -11,11 +11,11 @@ from sys import stderr
 import argparse
 
 # useful constants
-CONSOLES = {'PSX'}
-EXT_ISO = {'bin', 'cue', 'iso'}
-EXT_ALL = EXT_ISO # union all EXT_* sets
-PSX_START_LEN = 1000000 # search for ID in first PSX_START_LEN bytes of image data
-DEFAULT_BUFSIZE = max([PSX_START_LEN])
+CONSOLES = {'PSX', 'PS2'}
+START_LEN = { # search for ID in first START_LEN[console] bytes of image data (currently just PSX and PS2)
+    'PSX': 1000000,
+    'PS2': 1000000,
+}
 
 # print an error message and exit
 def error(message, exitcode=1):
@@ -25,12 +25,6 @@ def error(message, exitcode=1):
 def check_exists(fn):
     if not isfile(fn):
         error("File not found: %s" % fn)
-
-# throw an error for unsupported file extensions
-def check_extension(fn):
-    ext = fn.rstrip('.gz').split('.')[-1].strip().lower()
-    if ext not in EXT_ALL:
-        error("%s files are not supported (yet): %s" % (ext, fn))
 
 # throw an error for unsupported consoles
 def check_console(console):
@@ -60,7 +54,6 @@ def parse_args():
     # check input game file
     args.input = abspath(expanduser(args.input))
     check_exists(args.input)
-    check_extension(args.input)
 
     # check input database file
     args.database = abspath(expanduser(args.database))
@@ -78,19 +71,19 @@ def load_db(fn):
     db = pload(f); f.close()
     return db
 
-# identify PSX game
-def identify_psx(fn, db):
+# identify PSX/PS2 game
+def identify_psx_ps2(fn, console, db):
     if fn.lower().endswith('.cue'):
         fn = get_first_img_cue(fn)
     if fn.lower().endswith('.gz'):
         f = gopen(fn, 'rb')
     else:
-        f = open(fn, 'rb', buffering=DEFAULT_BUFSIZE)
-    data = f.read(PSX_START_LEN); offset = None; prefixes = db['GAMEID']['PSX']['ID_PREFIXES']
-    for i, v in enumerate(data):
+        f = open(fn, 'rb', buffering=START_LEN[console])
+    data = f.read(START_LEN[console]); offset = None; prefixes = db['GAMEID'][console]['ID_PREFIXES']
+    for prefix in prefixes:
         if offset is not None:
             break
-        for prefix in prefixes:
+        for i, v in enumerate(data):
             if offset is not None:
                 break
             found = True
@@ -106,14 +99,14 @@ def identify_psx(fn, db):
             if chr(data[i]) == '.':
                 continue
             serial += chr(data[i])
-        if serial in db['PSX']:
-            return db['PSX'][serial]
+        if serial in db[console]:
+            return db[console][serial]
 
 # identify game
 def identify(fn, console, db):
     check_console(console)
-    if console == 'PSX':
-        return identify_psx(fn, db)
+    if console in {'PSX', 'PS2'}:
+        return identify_psx_ps2(fn, console, db)
     else:
         raise RuntimeError("Shouldn't reach this")
 
@@ -123,7 +116,7 @@ def main():
     db = load_db(args.database)
     title = identify(args.input, args.console, db)
     if title is None:
-        error("Game not found: %s" % args.input)
+        error("%s game not found: %s" % (args.console, args.input))
     print(title)
 
 # run program
