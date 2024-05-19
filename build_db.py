@@ -63,10 +63,14 @@ if __name__ == "__main__":
         print("Invalid output file extension (must be .pkl or .pkl.gz): %s" % argv[1]); exit(1)
 
     # load GameDB databases
-    db = dict()
+    db = {'GAMEID': dict()}
     for console in CONSOLES:
         print("Loading GameDB-%s..." % console)
-        db[console] = load_gamedb(console)
+        db[console] = load_gamedb(console) # load GameDB
+        db['GAMEID'][console] = dict() # just in case I need to preprocess stuff for this console
+
+    # preprocess PSX serial beginnings for speed in GameID
+    db['GAMEID']['PSX']['ID_PREFIXES'] = {ID.split('_')[0].strip() for ID in db['PSX']}
 
     # dump GameID database
     print("Writing GameID database: %s" % argv[1])

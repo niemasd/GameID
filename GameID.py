@@ -14,6 +14,8 @@ import argparse
 CONSOLES = {'PSX'}
 EXT_ISO = {'bin', 'cue', 'iso'}
 EXT_ALL = EXT_ISO # union all EXT_* sets
+PSX_START_LEN = 1000000 # search for ID in first PSX_START_LEN bytes of image data
+DEFAULT_BUFSIZE = max([PSX_START_LEN])
 
 # print an error message and exit
 def error(message, exitcode=1):
@@ -80,18 +82,32 @@ def load_db(fn):
 def identify_psx(fn, db):
     if fn.lower().endswith('.cue'):
         fn = get_first_img_cue(fn)
-    fn_lower = fn.lower(); fn_lower_strip = fn.lower().rstrip('.gz')
-    if fn_lower_strip.endswith('.bin'):
-        offset = 0x9340 # BIN SLUS_XXXXX offset
-    else:
-        offset = 0x8478 # ISO SLUS_XXXXX offset
-    if fn_lower.endswith('.gz'):
+    if fn.lower().endswith('.gz'):
         f = gopen(fn, 'rb')
     else:
-        f = open(fn, 'rb')
-    serial = f.read(offset + 10)[-10:].decode()
-    if serial in db['PSX']:
-        return db['PSX'][serial]
+        f = open(fn, 'rb', buffering=DEFAULT_BUFSIZE)
+    data = f.read(PSX_START_LEN); offset = None; prefixes = db['GAMEID']['PSX']['ID_PREFIXES']
+    for i, v in enumerate(data):
+        if offset is not None:
+            break
+        for prefix in prefixes:
+            if offset is not None:
+                break
+            found = True
+            for j, c in enumerate(prefix):
+                if data[i+j] != ord(c):
+                    found = False; break
+            if found:
+                offset = i; break
+    if offset is not None:
+        serial = ''; i = offset-1
+        while len(serial) < 10:
+            i += 1
+            if chr(data[i]) == '.':
+                continue
+            serial += chr(data[i])
+        if serial in db['PSX']:
+            return db['PSX'][serial]
 
 # identify game
 def identify(fn, console, db):
