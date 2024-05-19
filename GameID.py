@@ -99,7 +99,6 @@ def identify_psx_ps2(fn, console, db):
             if chr(data[i]) == '.':
                 continue
             serial += chr(data[i])
-        #print([chr(data[i]) for i in range(offset, offset+11)]); print(serial) # TODO
         if serial in db[console]:
             return db[console][serial]
 
