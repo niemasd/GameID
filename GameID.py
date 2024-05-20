@@ -46,6 +46,7 @@ def parse_args():
     parser.add_argument('-i', '--input', required=True, type=str, help="Input Game File")
     parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(sorted(CONSOLES)))
     parser.add_argument('-d', '--database', required=True, type=str, help="GameID Database (db.pkl.gz)")
+    parser.add_argument('--delimiter', required=False, type=str, default='\t', help="Delimiter")
     args = parser.parse_args()
 
     # check console
@@ -102,7 +103,9 @@ def identify_psx_ps2(fn, console, db):
                 c = '_'
             serial += c
         if serial in db[console]:
-            return db[console][serial]
+            out = db[console][serial]
+            out['serial'] = serial
+            return out
 
 # identify game
 def identify(fn, console, db):
@@ -116,10 +119,10 @@ def identify(fn, console, db):
 def main():
     args = parse_args()
     db = load_db(args.database)
-    title = identify(args.input, args.console, db)
-    if title is None:
+    meta = identify(args.input, args.console, db)
+    if meta is None:
         error("%s game not found: %s" % (args.console, args.input))
-    print(title)
+    print('\n'.join('%s%s%s' % (k,args.delimiter,v) for k,v in meta.items()))
 
 # run program
 if __name__ == "__main__":

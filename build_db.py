@@ -22,27 +22,14 @@ def iter_gamedb_data_tsv(console):
     for line in urlopen(get_url(console)).read().decode().splitlines():
         yield [v.strip() for v in line.split('\t')]
 
-# get ID and title columns from header row of GameDB data.tsv file
-def get_ID_title_columns(header_row):
-    col_ID = None; col_title = None
-    for i, v in enumerate(header_row):
-        v_lower = v.strip().lower()
-        if v_lower == 'id':
-            col_ID = i
-        elif v_lower == 'title':
-            col_title = i
-    if col_ID is None or col_title is None:
-        print("Invalid GameDB data.tsv header row: %s" % header_row); exit(1)
-    return col_ID, col_title
-
 # load PSX or PS2 database
 def load_gamedb_psx_ps2(console):
     db = dict()
     for row_num, row in enumerate(iter_gamedb_data_tsv(console)):
         if row_num == 0:
-            col_ID, col_title = get_ID_title_columns(row); continue
-        ID = row[col_ID]; title = row[col_title]
-        db[ID.replace('-','_')] = title
+            field2index = {v:i for i,v in enumerate(row)}
+        else:
+            db[row[field2index['ID']].replace('-','_')] = {k:row[i] for k,i in field2index.items() if k != 'ID'}
     return db
 
 # load GameDB
