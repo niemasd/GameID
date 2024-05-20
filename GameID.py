@@ -90,15 +90,17 @@ def identify_psx_ps2(fn, console, db):
             for j, c in enumerate(prefix):
                 if data[i+j] != ord(c):
                     found = False; break
-            if found:
+            if found and chr(data[i+len(prefix)]) in {'_','-'}:
                 offset = i; break
     if offset is not None:
         serial = ''; i = offset-1
         while len(serial) < 10:
-            i += 1
-            if chr(data[i]) == '.':
+            i += 1; c = chr(data[i])
+            if c == '.':
                 continue
-            serial += chr(data[i])
+            elif c == '-':
+                c = '_'
+            serial += c
         if serial in db[console]:
             return db[console][serial]
 
