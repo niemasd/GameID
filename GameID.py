@@ -12,9 +12,8 @@ import argparse
 
 # useful constants
 CONSOLES = {'GC', 'PSX', 'PS2'}
-START_LEN = { # search for ID in first START_LEN[console] bytes of image data (currently just PSX and PS2)
+START_LEN = { # search for ID in first START_LEN[console] bytes of image data (currently just PSX)
     'PSX': 1000000,
-    'PS2': 1000000,
 }
 
 # print an error message and exit
@@ -105,15 +104,15 @@ def load_db(fn):
     db = pload(f); f.close()
     return db
 
-# identify PSX/PS2 game
-def identify_psx_ps2(fn, console, db, prefer_gamedb=False):
+# identify PSX game
+def identify_psx(fn, db, prefer_gamedb=False):
     if fn.lower().endswith('.cue'):
         fn = get_first_img_cue(fn)
     if fn.lower().endswith('.gz'):
         f = gopen(fn, 'rb')
     else:
-        f = open(fn, 'rb', buffering=START_LEN[console])
-    data = f.read(START_LEN[console]); offset = None; prefixes = db['GAMEID'][console]['ID_PREFIXES']
+        f = open(fn, 'rb', buffering=START_LEN['PSX'])
+    data = f.read(START_LEN['PSX']); offset = None; prefixes = db['GAMEID']['PSX']['ID_PREFIXES']
     for prefix in prefixes:
         if offset is not None:
             break
@@ -135,10 +134,22 @@ def identify_psx_ps2(fn, console, db, prefer_gamedb=False):
             elif c == '-':
                 c = '_'
             serial += c
-        if serial in db[console]:
-            out = db[console][serial]
+        if serial in db['PSX']:
+            out = db['PSX'][serial]
             out['ID'] = serial
             return out
+
+# identify PS2 game
+def identify_ps2(fn, db, prefer_gamedb=False):
+    iso = PyCdlib(); iso.open(fn); root_fns = [child.file_identifier().decode().strip() for child in iso.list_children(iso_path='/')]
+    for prefix in db['GAMEID']['PS2']['ID_PREFIXES']: # prioritize higher-frequency prefixes (just in case; should still be super fast)
+        for fn in root_fns:
+            if fn.upper().startswith(prefix):
+                serial = fn.replace('.','')[:10].replace('-','_')
+                if serial in db['PS2']:
+                    out = db['PS2'][serial]
+                    out['ID'] = serial
+                    return out
 
 # identify GC game
 def identify_gc(fn, db, prefer_gamedb=False):
@@ -165,21 +176,18 @@ def identify_gc(fn, db, prefer_gamedb=False):
             out['apploader_trailer_size'] = iso.apploaderTrailerSize
         return out
 
-# identify game
-def identify(fn, console, db, prefer_gamedb=False):
-    check_console(console)
-    if console in {'PSX', 'PS2'}:
-        return identify_psx_ps2(fn, console, db, prefer_gamedb=prefer_gamedb)
-    elif console == 'GC':
-        return identify_gc(fn, db, prefer_gamedb=prefer_gamedb)
-    else:
-        raise RuntimeError("Shouldn't reach this")
+# dictionary storing all identify functions
+IDENTIFY = {
+    'GC':  identify_gc,
+    'PSX': identify_psx,
+    'PS2': identify_ps2,
+}
 
 # main program logic
 def main():
     args = parse_args()
     db = load_db(args.database)
-    meta = identify(args.input, args.console, db, prefer_gamedb=args.prefer_gamedb)
+    meta = IDENTIFY[args.console](args.input, db, prefer_gamedb=args.prefer_gamedb)
     if meta is None:
         error("%s game not found: %s" % (args.console, args.input))
     f_out = open_text_output(args.output)
