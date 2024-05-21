@@ -27,6 +27,12 @@ try:
 except:
     error("Unable to import gciso. Install with: pip install git+https://github.com/pfirsich/gciso.git")
 
+# import pycdlib
+try:
+    from pycdlib import PyCdlib
+except:
+    error("Unable to import pycdlib. Install with: pip install pycdlib")
+
 # check if a file exists and throw an error if it doesn't
 def check_exists(fn):
     if not isfile(fn):
@@ -69,6 +75,7 @@ def parse_args():
     parser.add_argument('-d', '--database', required=True, type=str, help="GameID Database (db.pkl.gz)")
     parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
     parser.add_argument('--delimiter', required=False, type=str, default='\t', help="Delimiter")
+    parser.add_argument('--prefer_gamedb', action="store_true", help="Prefer Metadata in GameDB (rather than metadata loaded from game)")
     args = parser.parse_args()
 
     # check console
@@ -99,7 +106,7 @@ def load_db(fn):
     return db
 
 # identify PSX/PS2 game
-def identify_psx_ps2(fn, console, db):
+def identify_psx_ps2(fn, console, db, prefer_gamedb=False):
     if fn.lower().endswith('.cue'):
         fn = get_first_img_cue(fn)
     if fn.lower().endswith('.gz'):
@@ -134,21 +141,37 @@ def identify_psx_ps2(fn, console, db):
             return out
 
 # identify GC game
-def identify_gc(fn, db):
+def identify_gc(fn, db, prefer_gamedb=False):
     iso = GCIsoFile(fn)
     serial = iso.gameCode.decode()
     if serial in db['GC']:
         out = db['GC'][serial]
         out['ID'] = serial
+        if not prefer_gamedb: # https://gciso.readthedocs.io/en/latest/#gciso.IsoFile
+            out['maker_code'] = iso.makerCode.decode()
+            out['disk_ID'] = iso.diskId
+            out['version'] = iso.version
+            out['title'] = iso.gameName.decode()
+            out['dol_offset'] = iso.dolOffset
+            out['dol_size'] = iso.dolSize
+            out['fst_offset'] = iso.fstOffset
+            out['fst_size'] = iso.fstSize
+            out['max_fst_size'] = iso.maxFstSize
+            out['num_fst_entries'] = iso.numFstEntries
+            out['string_table_offset'] = iso.stringTableOffset
+            out['apploader_date'] = iso.apploaderDate.decode().replace('/','-')
+            out['apploader_entry_point'] = iso.apploaderEntryPoint
+            out['apploader_code_size'] = iso.apploaderCodeSize
+            out['apploader_trailer_size'] = iso.apploaderTrailerSize
         return out
 
 # identify game
-def identify(fn, console, db):
+def identify(fn, console, db, prefer_gamedb=False):
     check_console(console)
     if console in {'PSX', 'PS2'}:
-        return identify_psx_ps2(fn, console, db)
+        return identify_psx_ps2(fn, console, db, prefer_gamedb=prefer_gamedb)
     elif console == 'GC':
-        return identify_gc(fn, db)
+        return identify_gc(fn, db, prefer_gamedb=prefer_gamedb)
     else:
         raise RuntimeError("Shouldn't reach this")
 
@@ -156,7 +179,7 @@ def identify(fn, console, db):
 def main():
     args = parse_args()
     db = load_db(args.database)
-    meta = identify(args.input, args.console, db)
+    meta = identify(args.input, args.console, db, prefer_gamedb=args.prefer_gamedb)
     if meta is None:
         error("%s game not found: %s" % (args.console, args.input))
     f_out = open_text_output(args.output)
