@@ -11,7 +11,7 @@ from sys import stderr
 import argparse
 
 # useful constants
-CONSOLES = {'PSX', 'PS2'}
+CONSOLES = {'GC', 'PSX', 'PS2'}
 START_LEN = { # search for ID in first START_LEN[console] bytes of image data (currently just PSX and PS2)
     'PSX': 1000000,
     'PS2': 1000000,
@@ -20,6 +20,12 @@ START_LEN = { # search for ID in first START_LEN[console] bytes of image data (c
 # print an error message and exit
 def error(message, exitcode=1):
     print(message, file=stderr); exit(exitcode)
+
+# import gciso
+try:
+    from gciso import IsoFile as GCIsoFile
+except:
+    error("Unable to import gciso. Install with: pip install git+https://github.com/pfirsich/gciso.git")
 
 # throw an error if a file doesn't exist
 def check_exists(fn):
@@ -104,14 +110,25 @@ def identify_psx_ps2(fn, console, db):
             serial += c
         if serial in db[console]:
             out = db[console][serial]
-            out['serial'] = serial
+            out['ID'] = serial
             return out
+
+# identify GC game
+def identify_gc(fn, db):
+    iso = GCIsoFile(fn)
+    serial = iso.gameCode.decode()
+    if serial in db['GC']:
+        out = db['GC'][serial]
+        out['ID'] = serial
+        return out
 
 # identify game
 def identify(fn, console, db):
     check_console(console)
     if console in {'PSX', 'PS2'}:
         return identify_psx_ps2(fn, console, db)
+    elif console == 'GC':
+        return identify_gc(fn, db)
     else:
         raise RuntimeError("Shouldn't reach this")
 

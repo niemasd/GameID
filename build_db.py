@@ -11,7 +11,7 @@ from sys import argv
 from urllib.request import urlopen
 
 # constants
-CONSOLES = {'PSX', 'PS2'}
+CONSOLES = {'GC', 'PSX', 'PS2'}
 
 # get GameDB URL
 def get_url(console):
@@ -22,22 +22,17 @@ def iter_gamedb_data_tsv(console):
     for line in urlopen(get_url(console)).read().decode().splitlines():
         yield [v.strip() for v in line.split('\t')]
 
-# load PSX or PS2 database
-def load_gamedb_psx_ps2(console):
+# load GameDB database
+def load_gamedb(console):
+    if console not in CONSOLES:
+        print("Invalid console: %s" % console); exit(1)
     db = dict()
     for row_num, row in enumerate(iter_gamedb_data_tsv(console)):
         if row_num == 0:
             field2index = {v:i for i,v in enumerate(row)}
         else:
-            db[row[field2index['ID']].replace('-','_')] = {k:row[i] for k,i in field2index.items() if k != 'ID'}
+            db[row[field2index['ID']]] = {k:row[i] for k,i in field2index.items() if k != 'ID'}
     return db
-
-# load GameDB
-def load_gamedb(console):
-    if console in {'PSX', 'PS2'}:
-        return load_gamedb_psx_ps2(console)
-    else:
-        print("Invalid console: %s" % console); exit(1)
 
 # main program
 if __name__ == "__main__":
@@ -56,8 +51,15 @@ if __name__ == "__main__":
         db[console] = load_gamedb(console) # load GameDB
         db['GAMEID'][console] = dict() # just in case I need to preprocess stuff for this console
 
-    # preprocess PSX/PS2 serial beginnings for speed in GameID (sorted in decreasing order of frequency)
+    # fix GC (only keep middle part of DOL-XXXX-XXX serial)
+    db['GC'] = {k.split('-')[1].strip():v for k,v in db['GC'].items()}
+
+    # fix PSX and PS2
     for console in ['PSX', 'PS2']:
+        # replace '-' with '_' (most serials in ISO header are SXXX_XXXXX instead of SXXX-XXXXX)
+        db[console] = {k.replace('-','_'):v for k,v in db[console].items()}
+
+        # preprocess PSX/PS2 serial beginnings for speed in GameID (sorted in decreasing order of frequency)
         counts = dict()
         for ID in db[console]:
             prefix = ID.split('_')[0].strip()
