@@ -1,5 +1,9 @@
 # GameID
-Identify a game using [GameDB](https://github.com/niemasd/GameDB)
+Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported consoles:
+
+* `GC` - Nintendo GameCube
+* `PSX` - Sony PlayStation
+* `PS2` - Sony PlayStation 2
 
 ## Usage
 
