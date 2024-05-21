@@ -10,7 +10,7 @@ Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported con
 ### Build Database
 
 ```bash
-rm -f db.pkl.gz && ./build_db.py db.pkl.gz
+rm -f db.pkl.gz && ./scripts/build_db.py db.pkl.gz
 ```
 
 ### Identify a Game
