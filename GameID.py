@@ -27,10 +27,25 @@ try:
 except:
     error("Unable to import gciso. Install with: pip install git+https://github.com/pfirsich/gciso.git")
 
-# throw an error if a file doesn't exist
+# check if a file exists and throw an error if it doesn't
 def check_exists(fn):
     if not isfile(fn):
         error("File not found: %s" % fn)
+
+# check if a file doesn't exist and throw an error if it does
+def check_not_exists(fn):
+    if isfile(fn):
+        error("File exists: %s" % fn)
+
+# open an output text file for writing (automatically handle gzip)
+def open_text_output(fn):
+    if fn == 'stdout':
+        from sys import stdout as f_out
+    elif fn.strip().lower().endswith('.gz'):
+        f_out = gopen(fn, 'wt', compresslevel=9)
+    else:
+        f_out = open(fn, 'w')
+    return f_out
 
 # throw an error for unsupported consoles
 def check_console(console):
@@ -52,6 +67,7 @@ def parse_args():
     parser.add_argument('-i', '--input', required=True, type=str, help="Input Game File")
     parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(sorted(CONSOLES)))
     parser.add_argument('-d', '--database', required=True, type=str, help="GameID Database (db.pkl.gz)")
+    parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
     parser.add_argument('--delimiter', required=False, type=str, default='\t', help="Delimiter")
     args = parser.parse_args()
 
@@ -65,6 +81,10 @@ def parse_args():
     # check input database file
     args.database = abspath(expanduser(args.database))
     check_exists(args.database)
+
+    # check output file
+    if args.output != 'stdout':
+        check_not_exists(args.output)
 
     # all good, so return args
     return args
@@ -139,7 +159,9 @@ def main():
     meta = identify(args.input, args.console, db)
     if meta is None:
         error("%s game not found: %s" % (args.console, args.input))
-    print('\n'.join('%s%s%s' % (k,args.delimiter,v) for k,v in meta.items()))
+    f_out = open_text_output(args.output)
+    print('\n'.join('%s%s%s' % (k,args.delimiter,v) for k,v in meta.items()), file=f_out)
+    f_out.close()
 
 # run program
 if __name__ == "__main__":
