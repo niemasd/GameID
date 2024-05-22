@@ -5,15 +5,18 @@ GameID: Identify a game using GameDB
 
 # standard imports
 from gzip import open as gopen
-from os.path import abspath, expanduser, isfile
+from os.path import abspath, expanduser, getsize, isfile
 from pickle import load as pload
+from struct import unpack
 from sys import stderr
 import argparse
 
 # useful constants
 CONSOLES = {'GC', 'PSX', 'PS2'}
-START_LEN = { # search for ID in first START_LEN[console] bytes of image data (currently just PSX)
-    'PSX': 1000000,
+DEFAULT_BUFSIZE = 1000000
+PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
+BLOCK_SIZE = {
+    'PSX': 2352,
 }
 
 # print an error message and exit
@@ -25,12 +28,6 @@ try:
     from gciso import IsoFile as GCIsoFile
 except:
     error("Unable to import gciso. Install with: pip install git+https://github.com/pfirsich/gciso.git")
-
-# import pycdlib
-try:
-    from pycdlib import PyCdlib
-except:
-    error("Unable to import pycdlib. Install with: pip install pycdlib")
 
 # check if a file exists and throw an error if it doesn't
 def check_exists(fn):
@@ -64,6 +61,61 @@ def get_first_img_cue(fn):
     except:
         error("Invalid CUE file: %s" % fn)
     return '%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), img_fn)
+
+# get file names in a disc image
+def iso_get_fns(fn, console, only_root_dir=True, bufsize=DEFAULT_BUFSIZE):
+    # check block_size and set things up
+    size = getsize(fn)
+    if (size % 2352) == 0:
+        block_size = 2352
+    elif (size % 2048) == 0:
+        block_size = 2048
+    else:
+        error("Invalid disc image block size: %s" % fn)
+    block_offset = 0 # most console disc images start at the beginning
+    f = open(fn, 'rb', buffering=bufsize)
+
+    # PSX raw image starts at 0x18: https://github.com/cebix/ff7tools/blob/21dd8e29c1f1599d7c776738b1df20f2e9c06de0/ff7/cd.py#L30-L40
+    if console == 'PSX' and block_size == 2352:
+        block_offset = 0x18
+
+    # read PVD: https://wiki.osdev.org/ISO_9660#The_Primary_Volume_Descriptor
+    f.seek(block_offset + (16 * block_size)); pvd = f.read(2048)
+
+    # parse filenames: https://wiki.osdev.org/ISO_9660#Recursing_from_the_Root_Directory
+    root_dir_lba = unpack('<I', pvd[156 +  2 : 156 +  6])[0]
+    root_dir_len = unpack('<I', pvd[156 + 10 : 156 + 14])[0]
+    to_explore = [('/', root_dir_lba, root_dir_len)]; files = list()
+    while len(to_explore) != 0:
+        curr_path, curr_lba, curr_len = to_explore.pop(); f.seek(block_offset + (curr_lba * block_size)); curr_data = f.read(curr_len); i = 0
+        while i < len(curr_data):
+            next_len = curr_data[i + 0]
+            if next_len == 0:
+                break
+            next_ext_attr_rec_len = curr_data[i + 1]
+            next_lba = unpack('<I', curr_data[i + 2 : i + 6])[0]
+            next_data_len = unpack('<I', curr_data[i + 10 : i + 14])[0]
+            next_rec_date_time = curr_data[i + 18 : i + 25]
+            next_file_flags = curr_data[i + 25]
+            next_file_unit_size = curr_data[i + 26]
+            next_interleave_gap_size = curr_data[i + 27]
+            next_vol_seq_num = unpack('<H', curr_data[i + 28 : i + 30])[0]
+            next_name_len = curr_data[i + 32]
+            next_name = curr_data[i + 33 : i + 33 + next_name_len]
+            if next_name not in {b'\x00', b'\x01'}:
+                next_name = next_name.decode()
+                if next_name.endswith(';1'):
+                    next_path = '%s%s' % (curr_path, next_name[:-2])
+                else:
+                    next_path = '%s%s/' % (curr_path, next_name)
+                next_tup = (next_path, next_lba, next_len)
+                if not next_path.endswith('/'):
+                    files.append(next_tup)
+                elif not only_root_dir:
+                    #to_explore.append(next_tup) # doesn't work
+                    raise NotImplementedError("Currently only supports root directory")
+            i += next_len
+    return [x for x,y,z in files]
 
 # parse user arguments
 def parse_args():
@@ -105,51 +157,26 @@ def load_db(fn):
     return db
 
 # identify PSX game
-def identify_psx(fn, db, prefer_gamedb=False):
+def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
     if fn.lower().endswith('.cue'):
         fn = get_first_img_cue(fn)
-    if fn.lower().endswith('.gz'):
-        f = gopen(fn, 'rb')
-    else:
-        f = open(fn, 'rb', buffering=START_LEN['PSX'])
-    data = f.read(START_LEN['PSX']); offset = None; prefixes = db['GAMEID']['PSX']['ID_PREFIXES']
-    for prefix in prefixes:
-        if offset is not None:
-            break
-        for i, v in enumerate(data):
-            if offset is not None:
-                break
-            found = True
-            for j, c in enumerate(prefix):
-                if data[i+j] != ord(c):
-                    found = False; break
-            if found and chr(data[i+len(prefix)]) in {'_','-'}:
-                offset = i; break
-    if offset is not None:
-        serial = ''; i = offset-1
-        while len(serial) < 10:
-            i += 1; c = chr(data[i])
-            if c == '.':
-                continue
-            elif c == '-':
-                c = '_'
-            serial += c
-        if serial in db['PSX']:
-            out = db['PSX'][serial]
-            out['ID'] = serial
-            return out
+    root_fns = [fn.lstrip('/') for fn in iso_get_fns(fn, console, only_root_dir=True)]
+    for prefix in db['GAMEID'][console]['ID_PREFIXES']:
+        for fn in root_fns:
+            if fn.startswith(prefix):
+                serial = fn.replace('.','').replace('-','_')
+                if serial in db[console]:
+                    out = db[console][serial]
+                    out['ID'] = serial
+                    return out
+
+# identify PSX game
+def identify_psx(fn, db, prefer_gamedb=False):
+    return identify_psx_ps2(fn, db, 'PSX', prefer_gamedb=prefer_gamedb)
 
 # identify PS2 game
 def identify_ps2(fn, db, prefer_gamedb=False):
-    iso = PyCdlib(); iso.open(fn); root_fns = [child.file_identifier().decode().strip() for child in iso.list_children(iso_path='/')]
-    for prefix in db['GAMEID']['PS2']['ID_PREFIXES']: # prioritize higher-frequency prefixes (just in case; should still be super fast)
-        for fn in root_fns:
-            if fn.upper().startswith(prefix):
-                serial = fn.replace('.','')[:10].replace('-','_')
-                if serial in db['PS2']:
-                    out = db['PS2'][serial]
-                    out['ID'] = serial
-                    return out
+    return identify_psx_ps2(fn, db, 'PS2', prefer_gamedb=prefer_gamedb)
 
 # identify GC game
 def identify_gc(fn, db, prefer_gamedb=False):
