@@ -12,7 +12,7 @@ from sys import argv, stderr
 import argparse
 
 # useful constants
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
@@ -21,12 +21,6 @@ N64_FIRST_WORD = b'\x80\x37\x12\x40'
 # print an error message and exit
 def error(message, exitcode=1):
     print(message, file=stderr); exit(exitcode)
-
-# import gciso
-try:
-    from gciso import IsoFile as GCIsoFile
-except:
-    error("Unable to import gciso. Install with: pip install git+https://github.com/pfirsich/gciso.git")
 
 # check if a file exists and throw an error if it doesn't
 def check_exists(fn):
@@ -58,7 +52,7 @@ def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
     return f
 
 # helper class to handle disc images
-class GameISO:
+class ISO9660:
     # initialize ISO handling
     def __init__(self, fn, console, bufsize=DEFAULT_BUFSIZE):
         self.fn = abspath(expanduser(fn)); self.size = getsize(fn); self.console = console
@@ -177,7 +171,7 @@ def load_db(fn, bufsize=DEFAULT_BUFSIZE):
 
 # identify PSX game
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
-    iso = GameISO(fn, console)
+    iso = ISO9660(fn, console)
 
     # try to find file in root directory with name SXXX_XXX.XX
     root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len in iso.get_filenames(only_root_dir=True)]
@@ -214,7 +208,14 @@ def identify_ps2(fn, db, prefer_gamedb=False):
 
 # identify GC game
 def identify_gc(fn, db, prefer_gamedb=False):
+    # open GC ISO
+    try:
+        from gciso import IsoFile as GCIsoFile
+    except:
+        error("Unable to import gciso. Install with: pip install git+https://github.com/pfirsich/gciso.git")
     iso = GCIsoFile(fn)
+
+    # identify game
     serial = iso.gameCode.decode()
     if serial in db['GC']:
         out = db['GC'][serial]
