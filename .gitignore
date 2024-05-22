@@ -1,6 +1,7 @@
 # Game files
 *.bin
 *.cue
+*.gz
 *.iso
 *.n64
 *.z64

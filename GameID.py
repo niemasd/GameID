@@ -8,10 +8,11 @@ from gzip import open as gopen
 from os.path import abspath, expanduser, getsize, isfile
 from pickle import load as pload
 from struct import unpack
-from sys import stderr
+from sys import argv, stderr
 import argparse
 
 # useful constants
+VERSION = '1.0.0'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
@@ -136,6 +137,10 @@ class GameISO:
 
 # parse user arguments
 def parse_args():
+    # if --version, just print version and exit
+    if '--version' in argv:
+        print("GameID v%s" % VERSION); exit()
+
     # run argparse
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-i', '--input', required=True, type=str, help="Input Game File")
@@ -144,6 +149,7 @@ def parse_args():
     parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
     parser.add_argument('--delimiter', required=False, type=str, default='\t', help="Delimiter")
     parser.add_argument('--prefer_gamedb', action="store_true", help="Prefer Metadata in GameDB (rather than metadata loaded from game)")
+    parser.add_argument('--version', action="store_true", help="Print GameID Version (%s)" % VERSION)
     args = parser.parse_args()
 
     # check console
@@ -231,8 +237,10 @@ def identify_gc(fn, db, prefer_gamedb=False):
             out['apploader_trailer_size'] = iso.apploaderTrailerSize
         return out
 
-# helper function convert from little-endian N64 data to big-endian
-def n64_little_to_big(data):
+# helper function convert N64 data between little-endian and big-endian
+def n64_convert_endianness(data):
+    if len(data) % 2 != 0:
+        error("Can only convert even-length data")
     out = bytearray(len(data))
     for i in range(0, len(data), 2):
         out[i] = data[i+1]; out[i+1] = data[i]
@@ -240,25 +248,18 @@ def n64_little_to_big(data):
 
 # identify N64 game
 def identify_n64(fn, db, prefer_gamedb=False):
-    f = open_file(fn, mode='rb'); data = f.read()
+    f = open_file(fn, mode='rb'); header = f.read(0x40) # stop before "Boot code/strap"
 
     # determine endianness from first word: https://en64.shoutwiki.com/wiki/ROM
-    first_word_data = data[0 : 4]
-    if first_word_data == N64_FIRST_WORD:
-        big_endian = True
-    elif n64_little_to_big(first_word_data) == N64_FIRST_WORD:
-        big_endian = False
-    else:
+    first_word_data = header[0 : 4]
+    if n64_convert_endianness(first_word_data) == N64_FIRST_WORD: # little-endian, so need to convert to big-endian
+        header = n64_convert_endianness(header)
+    elif first_word_data != N64_FIRST_WORD: # doesn't match either endianness
         error("Invalid N64 ROM: %s" % fn)
 
     # parse N64 ROM header: https://en64.shoutwiki.com/wiki/ROM#Cartridge_ROM_Header
-    cartridge_ID = data[0x3c : 0x3e]
-    if not big_endian:
-        cartridge_ID = n64_little_to_big(cartridge_ID)
-    tmp = data[0x3e : 0x40]
-    if not big_endian:
-        tmp = n64_little_to_big(tmp)
-    country_code, version = tmp
+    cartridge_ID = header[0x3c : 0x3e]
+    country_code, version = header[0x3e : 0x40]
 
     # identify game
     try:
@@ -269,16 +270,14 @@ def identify_n64(fn, db, prefer_gamedb=False):
         out = db['N64'][serial]
         out['ID'] = serial
         if not prefer_gamedb:
-            internal_name = data[0x20 : 0x34]
-            if not big_endian:
-                internal_name = n64_little_to_big(internal_name)
+            internal_name = header[0x20 : 0x34]
             try:
                 out['title'] = internal_name.decode().strip()
             except:
-                pass
+                out['title'] = internal_name
+        f.close()
         return out
-    error("N64 game not found (%s %s): %s" % (cartridge_ID, country_code, fn))
-    f.close()
+    f.close(); error("N64 game not found (%s %s): %s" % (cartridge_ID, country_code, fn))
 
 # dictionary storing all identify functions
 IDENTIFY = {
