@@ -6,6 +6,8 @@ Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported con
 * `PSX` - Sony PlayStation
 * `PS2` - Sony PlayStation 2
 
+This tool is being actively developed, and updates will be pushed somewhat frequently. As such, be sure to periodically `git pull` an up-to-date version of this repository to ensure you have access to all of the latest features and optimizations.
+
 ## Usage
 
 ```
