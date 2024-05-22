@@ -13,8 +13,9 @@ import argparse
 
 # useful constants
 DEFAULT_BUFSIZE = 1000000
-PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
+PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
+N64_FIRST_WORD = b'\x80\x37\x12\x40'
 
 # print an error message and exit
 def error(message, exitcode=1):
@@ -61,7 +62,9 @@ class GameISO:
     def __init__(self, fn, console, bufsize=DEFAULT_BUFSIZE):
         self.fn = abspath(expanduser(fn)); self.size = getsize(fn); self.console = console
         if fn.lower().endswith('.cue'):
-            self.bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in open_file(fn, 'rt', bufsize=bufsize) if l.strip().lower().startswith('file')]
+            f_cue = open_file(fn, 'rt', bufsize=bufsize)
+            self.bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in f_cue if l.strip().lower().startswith('file')]
+            f_cue.close()
             self.size = sum(getsize(b) for b in self.bins)
             self.f = open_file(self.bins[0], 'rb', bufsize=bufsize)
         else:
@@ -228,14 +231,59 @@ def identify_gc(fn, db, prefer_gamedb=False):
             out['apploader_trailer_size'] = iso.apploaderTrailerSize
         return out
 
+# helper function convert from little-endian N64 data to big-endian
+def n64_little_to_big(data):
+    out = bytearray(len(data))
+    for i in range(0, len(data), 2):
+        out[i] = data[i+1]; out[i+1] = data[i]
+    return out
+
+# identify N64 game
 def identify_n64(fn, db, prefer_gamedb=False):
-    data = open_file(fn, mode='rb')
-    exit() # TODO
+    f = open_file(fn, mode='rb'); data = f.read()
+
+    # determine endianness from first word: https://en64.shoutwiki.com/wiki/ROM
+    first_word_data = data[0 : 4]
+    if first_word_data == N64_FIRST_WORD:
+        big_endian = True
+    elif n64_little_to_big(first_word_data) == N64_FIRST_WORD:
+        big_endian = False
+    else:
+        error("Invalid N64 ROM: %s" % fn)
+
+    # parse N64 ROM header: https://en64.shoutwiki.com/wiki/ROM#Cartridge_ROM_Header
+    cartridge_ID = data[0x3c : 0x3e]
+    if not big_endian:
+        cartridge_ID = n64_little_to_big(cartridge_ID)
+    tmp = data[0x3e : 0x40]
+    if not big_endian:
+        tmp = n64_little_to_big(tmp)
+    country_code, version = tmp
+
+    # identify game
+    try:
+        serial = '%s%s%s' % (chr(cartridge_ID[0]), chr(cartridge_ID[1]), chr(country_code))
+    except:
+        error("Invalid N64 ROM (%s %s): %s" % (cartridge_ID, country_code, fn))
+    if serial in db['N64']:
+        out = db['N64'][serial]
+        out['ID'] = serial
+        if not prefer_gamedb:
+            internal_name = data[0x20 : 0x34]
+            if not big_endian:
+                internal_name = n64_little_to_big(internal_name)
+            try:
+                out['title'] = internal_name.decode().strip()
+            except:
+                pass
+        return out
+    error("N64 game not found (%s %s): %s" % (cartridge_ID, country_code, fn))
+    f.close()
 
 # dictionary storing all identify functions
 IDENTIFY = {
     'GC':  identify_gc,
-    #'N64': identify_n64,
+    'N64': identify_n64,
     'PSX': identify_psx,
     'PS2': identify_ps2,
 }

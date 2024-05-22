@@ -2,6 +2,7 @@
 Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported consoles:
 
 * `GC` - Nintendo GameCube
+* `N64` - Nintendo 64
 * `PSX` - Sony PlayStation
 * `PS2` - Sony PlayStation 2
 
@@ -13,7 +14,7 @@ usage: GameID.py [-h] -i INPUT -c CONSOLE -d DATABASE [-o OUTPUT] [--delimiter D
 options:
   -h, --help                         show this help message and exit
   -i INPUT, --input INPUT            Input Game File (default: None)
-  -c CONSOLE, --console CONSOLE      Console (options: GC, PS2, PSX) (default: None)
+  -c CONSOLE, --console CONSOLE      Console (options: GC, N64, PS2, PSX) (default: None)
   -d DATABASE, --database DATABASE   GameID Database (db.pkl.gz) (default: None)
   -o OUTPUT, --output OUTPUT         Output File (default: stdout)
   --delimiter DELIMITER              Delimiter (default: '\t')

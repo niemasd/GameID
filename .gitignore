@@ -2,6 +2,8 @@
 *.bin
 *.cue
 *.iso
+*.n64
+*.z64
 *games/
 
 # Byte-compiled / optimized / DLL files

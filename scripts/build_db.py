@@ -52,10 +52,16 @@ if __name__ == "__main__":
         db['GAMEID'][console] = dict() # just in case I need to preprocess stuff for this console
 
     # fix GC (only keep middle part of DOL-XXXX-XXX serial)
+    print("Fixing GC database...")
     db['GC'] = {k.split('-')[1].strip():v for k,v in db['GC'].items()}
+
+    # fix N64 (only keep last 3 letters of middle part of NUS-NXXX-XXX serial)
+    print("Fixing N64 database...")
+    db['N64'] = {k.split('-')[1][1:]:v for k,v in db['N64'].items()}
 
     # fix PSX and PS2
     for console in ['PSX', 'PS2']:
+        print("Fixing %s database..." % console)
         # replace '-' with '_' (most serials in ISO header are SXXX_XXXXX instead of SXXX-XXXXX)
         db[console] = {k.replace('-','_'):v for k,v in db[console].items()}
 
