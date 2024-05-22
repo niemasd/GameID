@@ -51,71 +51,81 @@ def check_console(console):
     if console not in CONSOLES:
         error("Invalid console: %s\nOptions: %s" % (console, ', '.join(sorted(CONSOLES))))
 
-# get path of first image file from CUE
-def get_first_img_cue(fn):
-    try:
-        img_fn = [l.split('"')[1].strip() for l in open(fn) if l.strip().lower().startswith('file')][0]
-    except:
-        error("Invalid CUE file: %s" % fn)
-    return '%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), img_fn)
+# helper class to handle disc images
+class GameISO:
+    # initialize ISO handling
+    def __init__(self, fn, console, bufsize=DEFAULT_BUFSIZE):
+        self.fn = abspath(expanduser(fn)); self.size = getsize(fn); self.console = console
+        if fn.lower().endswith('.cue'):
+            self.bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in open(fn) if l.strip().lower().startswith('file')]
+            self.size = sum(getsize(b) for b in self.bins)
+            self.f = open(self.bins[0], 'rb', buffering=bufsize)
+        else:
+            self.f = open(self.fn, 'rb', buffering=bufsize)
+        if (self.size % 2352) == 0:
+            self.block_size = 2352
+        elif (self.size % 2048) == 0:
+            self.block_size = 2048
+        else:
+            error("Invalid disc image block size: %s" % fn)
 
-# get file names in a disc image
-def iso_get_fns(fn, console, only_root_dir=True, bufsize=DEFAULT_BUFSIZE):
-    # check block_size and set things up
-    size = getsize(fn)
-    if (size % 2352) == 0:
-        block_size = 2352
-    elif (size % 2048) == 0:
-        block_size = 2048
-    else:
-        error("Invalid disc image block size: %s" % fn)
-    block_offset = 0 # most console disc images start at the beginning
-    f = open(fn, 'rb', buffering=bufsize)
+        # PSX raw image starts at 0x18: https://github.com/cebix/ff7tools/blob/21dd8e29c1f1599d7c776738b1df20f2e9c06de0/ff7/cd.py#L30-L40
+        if self.console == 'PSX' and self.block_size == 2352:
+            self.block_offset = 0x18
+        else:
+            self.block_offset = 0 # most console disc images start at the beginning
 
-    # PSX raw image starts at 0x18: https://github.com/cebix/ff7tools/blob/21dd8e29c1f1599d7c776738b1df20f2e9c06de0/ff7/cd.py#L30-L40
-    if console == 'PSX' and block_size == 2352:
-        block_offset = 0x18
+        # read PVD: https://wiki.osdev.org/ISO_9660#The_Primary_Volume_Descriptor
+        self.f.seek(self.block_offset + (16 * self.block_size)); self.pvd = self.f.read(2048)
 
-    # read PVD: https://wiki.osdev.org/ISO_9660#The_Primary_Volume_Descriptor
-    f.seek(block_offset + (16 * block_size)); pvd = f.read(2048)
+    # get volume ID
+    def get_volume_ID(self):
+        volume_ID = self.pvd[40 : 72]
+        try:
+            return volume_ID.decode().strip()
+        except:
+            return volume_ID
 
     # parse filenames: https://wiki.osdev.org/ISO_9660#Recursing_from_the_Root_Directory
-    root_dir_lba = unpack('<I', pvd[156 +  2 : 156 +  6])[0]
-    root_dir_len = unpack('<I', pvd[156 + 10 : 156 + 14])[0]
-    to_explore = [('/', root_dir_lba, root_dir_len)]; files = list()
-    while len(to_explore) != 0:
-        curr_path, curr_lba, curr_len = to_explore.pop(); f.seek(block_offset + (curr_lba * block_size)); curr_data = f.read(curr_len); i = 0
-        while i < len(curr_data):
-            next_len = curr_data[i + 0]
-            if next_len == 0:
-                break
-            next_ext_attr_rec_len = curr_data[i + 1]
-            next_lba = unpack('<I', curr_data[i + 2 : i + 6])[0]
-            next_data_len = unpack('<I', curr_data[i + 10 : i + 14])[0]
-            next_rec_date_time = curr_data[i + 18 : i + 25]
-            next_file_flags = curr_data[i + 25]
-            next_file_unit_size = curr_data[i + 26]
-            next_interleave_gap_size = curr_data[i + 27]
-            next_vol_seq_num = unpack('<H', curr_data[i + 28 : i + 30])[0]
-            next_name_len = curr_data[i + 32]
-            next_name = curr_data[i + 33 : i + 33 + next_name_len]
-            if next_name not in {b'\x00', b'\x01'}:
-                try:
-                    next_name = next_name.decode()
-                    if next_name.endswith(';1'):
-                        next_path = '%s%s' % (curr_path, next_name[:-2])
-                    else:
-                        next_path = '%s%s/' % (curr_path, next_name)
-                    next_tup = (next_path, next_lba, next_len)
-                    if not next_path.endswith('/'):
-                        files.append(next_tup)
-                    elif not only_root_dir:
-                        #to_explore.append(next_tup) # doesn't work
-                        raise NotImplementedError("Currently only supports root directory")
-                except:
-                    pass # skip trying to load filename that's not a valid string
-            i += next_len
-    return files
+    def get_filenames(self, only_root_dir=True):
+        root_dir_lba = unpack('<I', self.pvd[156 +  2 : 156 +  6])[0]
+        root_dir_len = unpack('<I', self.pvd[156 + 10 : 156 + 14])[0]
+        to_explore = [('/', root_dir_lba, root_dir_len)]; files = list()
+        while len(to_explore) != 0:
+            curr_path, curr_lba, curr_len = to_explore.pop()
+            self.f.seek(self.block_offset + (curr_lba * self.block_size))
+            curr_data = self.f.read(curr_len); i = 0
+            while i < len(curr_data):
+                next_len = curr_data[i + 0]
+                if next_len == 0:
+                    break
+                next_ext_attr_rec_len = curr_data[i + 1]
+                next_lba = unpack('<I', curr_data[i + 2 : i + 6])[0]
+                next_data_len = unpack('<I', curr_data[i + 10 : i + 14])[0]
+                next_rec_date_time = curr_data[i + 18 : i + 25]
+                next_file_flags = curr_data[i + 25]
+                next_file_unit_size = curr_data[i + 26]
+                next_interleave_gap_size = curr_data[i + 27]
+                next_vol_seq_num = unpack('<H', curr_data[i + 28 : i + 30])[0]
+                next_name_len = curr_data[i + 32]
+                next_name = curr_data[i + 33 : i + 33 + next_name_len]
+                if next_name not in {b'\x00', b'\x01'}:
+                    try:
+                        next_name = next_name.decode()
+                        if next_name.endswith(';1'):
+                            next_path = '%s%s' % (curr_path, next_name[:-2])
+                        else:
+                            next_path = '%s%s/' % (curr_path, next_name)
+                        next_tup = (next_path, next_lba, next_len)
+                        if not next_path.endswith('/'):
+                            files.append(next_tup)
+                        elif not only_root_dir:
+                            #to_explore.append(next_tup) # doesn't work
+                            raise NotImplementedError("Currently only supports root directory")
+                    except:
+                        pass # skip trying to load filename that's not a valid string
+                i += next_len
+        return files
 
 # parse user arguments
 def parse_args():
@@ -158,9 +168,10 @@ def load_db(fn):
 
 # identify PSX game
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
-    if fn.lower().endswith('.cue'):
-        fn = get_first_img_cue(fn)
-    root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len  in iso_get_fns(fn, console, only_root_dir=True)]
+    iso = GameISO(fn, console)
+
+    # try to find file in root directory with name SXXX_XXX.XX
+    root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len in iso.get_filenames(only_root_dir=True)]
     for prefix in db['GAMEID'][console]['ID_PREFIXES']:
         for root_fn in root_fns:
             if root_fn.startswith(prefix):
@@ -171,7 +182,18 @@ def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
                     out = db[console][serial]
                     out['ID'] = serial
                     return out
-    error("%s game not found: %s\t%s" % (console, fn, root_fns))
+
+    # failed to find serial based on file, so try volume ID
+    volume_ID = iso.get_volume_ID()
+    if isinstance(volume_ID, str):
+        serial = volume_ID.replace('-','_'); num_underscore = serial.count('_')
+        if num_underscore == 2:
+            serial = '_'.join(serial.split('_')[:2])
+        if serial in db[console]:
+            out = db[console][serial]
+            out['ID'] = serial
+            return out
+    error("%s game not found (%s): %s\t%s" % (console, volume_ID, fn, root_fns))
 
 # identify PSX game
 def identify_psx(fn, db, prefer_gamedb=False):
