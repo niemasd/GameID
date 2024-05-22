@@ -100,17 +100,20 @@ def iso_get_fns(fn, console, only_root_dir=True, bufsize=DEFAULT_BUFSIZE):
             next_name_len = curr_data[i + 32]
             next_name = curr_data[i + 33 : i + 33 + next_name_len]
             if next_name not in {b'\x00', b'\x01'}:
-                next_name = next_name.decode()
-                if next_name.endswith(';1'):
-                    next_path = '%s%s' % (curr_path, next_name[:-2])
-                else:
-                    next_path = '%s%s/' % (curr_path, next_name)
-                next_tup = (next_path, next_lba, next_len)
-                if not next_path.endswith('/'):
-                    files.append(next_tup)
-                elif not only_root_dir:
-                    #to_explore.append(next_tup) # doesn't work
-                    raise NotImplementedError("Currently only supports root directory")
+                try:
+                    next_name = next_name.decode()
+                    if next_name.endswith(';1'):
+                        next_path = '%s%s' % (curr_path, next_name[:-2])
+                    else:
+                        next_path = '%s%s/' % (curr_path, next_name)
+                    next_tup = (next_path, next_lba, next_len)
+                    if not next_path.endswith('/'):
+                        files.append(next_tup)
+                    elif not only_root_dir:
+                        #to_explore.append(next_tup) # doesn't work
+                        raise NotImplementedError("Currently only supports root directory")
+                except:
+                    pass # skip trying to load filename that's not a valid string
             i += next_len
     return files
 
@@ -157,15 +160,18 @@ def load_db(fn):
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
     if fn.lower().endswith('.cue'):
         fn = get_first_img_cue(fn)
-    root_fns = [fn.lstrip('/') for fn, file_lba, file_len  in iso_get_fns(fn, console, only_root_dir=True)]
+    root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len  in iso_get_fns(fn, console, only_root_dir=True)]
     for prefix in db['GAMEID'][console]['ID_PREFIXES']:
-        for fn in root_fns:
-            if fn.startswith(prefix):
-                serial = fn.replace('.','').replace('-','_')
+        for root_fn in root_fns:
+            if root_fn.startswith(prefix):
+                serial = root_fn.replace('.','').replace('-','_')
+                if serial not in db[console] and len(serial) > len(prefix): # might have a different delimiter than '-' or '_' (e.g. DQ7 is 'SLUSP012.06)
+                    serial = serial[:len(prefix)] + '_' + serial[len(prefix)+1:]
                 if serial in db[console]:
                     out = db[console][serial]
                     out['ID'] = serial
                     return out
+    error("%s game not found: %s\t%s" % (console, fn, root_fns))
 
 # identify PSX game
 def identify_psx(fn, db, prefer_gamedb=False):
