@@ -15,9 +15,6 @@ import argparse
 CONSOLES = {'GC', 'PSX', 'PS2'}
 DEFAULT_BUFSIZE = 1000000
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
-BLOCK_SIZE = {
-    'PSX': 2352,
-}
 
 # print an error message and exit
 def error(message, exitcode=1):
