@@ -37,3 +37,7 @@ find psx_games/ -type f -iname "*.cue" -o -iname "*.iso" | parallel --jobs 8 ./G
 ```bash
 rm -f db.pkl.gz && ./scripts/build_db.py db.pkl.gz
 ```
+
+## Acknowledgements
+
+Thanks to [MiSTer Addons](https://misteraddons.com/) for the idea and for help with testing!
