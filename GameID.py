@@ -112,7 +112,7 @@ def iso_get_fns(fn, console, only_root_dir=True, bufsize=DEFAULT_BUFSIZE):
                     #to_explore.append(next_tup) # doesn't work
                     raise NotImplementedError("Currently only supports root directory")
             i += next_len
-    return [x for x,y,z in files]
+    return files
 
 # parse user arguments
 def parse_args():
@@ -157,7 +157,7 @@ def load_db(fn):
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
     if fn.lower().endswith('.cue'):
         fn = get_first_img_cue(fn)
-    root_fns = [fn.lstrip('/') for fn in iso_get_fns(fn, console, only_root_dir=True)]
+    root_fns = [fn.lstrip('/') for fn, file_lba, file_len  in iso_get_fns(fn, console, only_root_dir=True)]
     for prefix in db['GAMEID'][console]['ID_PREFIXES']:
         for fn in root_fns:
             if fn.startswith(prefix):
