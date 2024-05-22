@@ -12,9 +12,9 @@ from sys import stderr
 import argparse
 
 # useful constants
-CONSOLES = {'GC', 'PSX', 'PS2'}
 DEFAULT_BUFSIZE = 1000000
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
+FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 
 # print an error message and exit
 def error(message, exitcode=1):
@@ -37,19 +37,23 @@ def check_not_exists(fn):
         error("File exists: %s" % fn)
 
 # open an output text file for writing (automatically handle gzip)
-def open_text_output(fn):
+def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
     if fn == 'stdout':
-        from sys import stdout as f_out
+        from sys import stdout as f
+    elif fn == 'stdin':
+        from sys import stdin as f
     elif fn.strip().lower().endswith('.gz'):
-        f_out = gopen(fn, 'wt', compresslevel=9)
+        if mode not in FILE_MODES_GZ:
+            error("Invalid gzip file mode: %s" % mode)
+        elif 'r' in mode:
+            f = gopen(fn, mode)
+        elif 'w' in mode:
+            f = gopen(fn, mode, compresslevel=9)
+        else:
+            error("Invalid gzip file mode: %s" % mode)
     else:
-        f_out = open(fn, 'w')
-    return f_out
-
-# throw an error for unsupported consoles
-def check_console(console):
-    if console not in CONSOLES:
-        error("Invalid console: %s\nOptions: %s" % (console, ', '.join(sorted(CONSOLES))))
+        f = open(fn, mode, buffering=bufsize)
+    return f
 
 # helper class to handle disc images
 class GameISO:
@@ -57,11 +61,11 @@ class GameISO:
     def __init__(self, fn, console, bufsize=DEFAULT_BUFSIZE):
         self.fn = abspath(expanduser(fn)); self.size = getsize(fn); self.console = console
         if fn.lower().endswith('.cue'):
-            self.bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in open(fn) if l.strip().lower().startswith('file')]
+            self.bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in open_file(fn, 'rt', bufsize=bufsize) if l.strip().lower().startswith('file')]
             self.size = sum(getsize(b) for b in self.bins)
-            self.f = open(self.bins[0], 'rb', buffering=bufsize)
+            self.f = open_file(self.bins[0], 'rb', bufsize=bufsize)
         else:
-            self.f = open(self.fn, 'rb', buffering=bufsize)
+            self.f = open_file(self.fn, 'rb', bufsize=bufsize)
         if (self.size % 2352) == 0:
             self.block_size = 2352
         elif (self.size % 2048) == 0:
@@ -132,7 +136,7 @@ def parse_args():
     # run argparse
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-i', '--input', required=True, type=str, help="Input Game File")
-    parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(sorted(CONSOLES)))
+    parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(sorted(IDENTIFY.keys())))
     parser.add_argument('-d', '--database', required=True, type=str, help="GameID Database (db.pkl.gz)")
     parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
     parser.add_argument('--delimiter', required=False, type=str, default='\t', help="Delimiter")
@@ -158,12 +162,8 @@ def parse_args():
     return args
 
 # load GameID database
-def load_db(fn):
-    if fn.lower().endswith('.gz'):
-        f = gopen(fn, 'rb')
-    else:
-        f = open(fn, 'rb')
-    db = pload(f); f.close()
+def load_db(fn, bufsize=DEFAULT_BUFSIZE):
+    f = open_file(fn, 'rb', bufsize=bufsize); db = pload(f); f.close()
     return db
 
 # identify PSX game
@@ -228,12 +228,22 @@ def identify_gc(fn, db, prefer_gamedb=False):
             out['apploader_trailer_size'] = iso.apploaderTrailerSize
         return out
 
+def identify_n64(fn, db, prefer_gamedb=False):
+    data = open_file(fn, mode='rb')
+    exit() # TODO
+
 # dictionary storing all identify functions
 IDENTIFY = {
     'GC':  identify_gc,
+    #'N64': identify_n64,
     'PSX': identify_psx,
     'PS2': identify_ps2,
 }
+
+# throw an error for unsupported consoles
+def check_console(console):
+    if console not in IDENTIFY:
+        error("Invalid console: %s\nOptions: %s" % (console, ', '.join(sorted(IDENTIFY.keys()))))
 
 # main program logic
 def main():
@@ -242,7 +252,7 @@ def main():
     meta = IDENTIFY[args.console](args.input, db, prefer_gamedb=args.prefer_gamedb)
     if meta is None:
         error("%s game not found: %s" % (args.console, args.input))
-    f_out = open_text_output(args.output)
+    f_out = open_file(args.output, 'wt')
     print('\n'.join('%s%s%s' % (k,args.delimiter,v) for k,v in meta.items()), file=f_out)
     f_out.close()
 

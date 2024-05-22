@@ -11,7 +11,7 @@ from sys import argv
 from urllib.request import urlopen
 
 # constants
-CONSOLES = {'GC', 'PSX', 'PS2'}
+CONSOLES = {'GC', 'N64', 'PSX', 'PS2'}
 
 # get GameDB URL
 def get_url(console):
