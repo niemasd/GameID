@@ -11,7 +11,7 @@ This tool is being actively developed, and updates will be pushed somewhat frequ
 ## Usage
 
 ```
-usage: GameID.py [-h] -i INPUT -c CONSOLE -d DATABASE [-o OUTPUT] [--delimiter DELIMITER] [--prefer_gamedb]
+usage: GameID.py [-h] -i INPUT -c CONSOLE [-d DATABASE] [-o OUTPUT] [--delimiter DELIMITER] [--prefer_gamedb]
 
 options:
   -h, --help                         show this help message and exit
@@ -22,6 +22,8 @@ options:
   --delimiter DELIMITER              Delimiter (default: '\t')
   --prefer_gamedb                    Prefer Metadata in GameDB (rather than metadata loaded from game) (default: False)
 ```
+
+If the database ([`db.pkl.gz`](db.pkl.gz)) is not provided via `-d`, it will be downloaded from this repo. This is **very slow**, so we strongly recommend providing it if you are running GameID in bulk (or if your environment does not have internet connection).
 
 ### Example: Identify a Game
 

@@ -4,15 +4,17 @@ GameID: Identify a game using GameDB
 '''
 
 # standard imports
+from gzip import decompress as gdecompress
 from gzip import open as gopen
 from os.path import abspath, expanduser, getsize, isfile
-from pickle import load as pload
+from pickle import loads as ploads
 from struct import unpack
 from sys import argv, stderr
 import argparse
 
 # useful constants
-VERSION = '1.0.1'
+VERSION = '1.0.2'
+DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
@@ -139,7 +141,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-i', '--input', required=True, type=str, help="Input Game File")
     parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(sorted(IDENTIFY.keys())))
-    parser.add_argument('-d', '--database', required=True, type=str, help="GameID Database (db.pkl.gz)")
+    parser.add_argument('-d', '--database', required=False, type=str, default=None, help="GameID Database (db.pkl.gz)")
     parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
     parser.add_argument('--delimiter', required=False, type=str, default='\t', help="Delimiter")
     parser.add_argument('--prefer_gamedb', action="store_true", help="Prefer Metadata in GameDB (rather than metadata loaded from game)")
@@ -154,8 +156,9 @@ def parse_args():
     check_exists(args.input)
 
     # check input database file
-    args.database = abspath(expanduser(args.database))
-    check_exists(args.database)
+    if args.database is not None:
+        args.database = abspath(expanduser(args.database))
+        check_exists(args.database)
 
     # check output file
     if args.output != 'stdout':
@@ -166,8 +169,11 @@ def parse_args():
 
 # load GameID database
 def load_db(fn, bufsize=DEFAULT_BUFSIZE):
-    f = open_file(fn, 'rb', bufsize=bufsize); db = pload(f); f.close()
-    return db
+    if fn is None:
+        from urllib.request import urlopen; data = gdecompress(urlopen(DB_URL).read())
+    else:
+        f = open_file(fn, 'rb', bufsize=bufsize); data = f.read(); f.close()
+    return ploads(data)
 
 # identify PSX game
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
