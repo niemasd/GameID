@@ -13,12 +13,16 @@ from sys import argv, stderr
 import argparse
 
 # useful constants
-VERSION = '1.0.2'
+VERSION = '1.0.3'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
 N64_FIRST_WORD = b'\x80\x37\x12\x40'
+
+# print a log message
+def print_log(message='', end='\n', file=stderr):
+    print(message, end=end, file=file); file.flush()
 
 # print an error message and exit
 def error(message, exitcode=1):
@@ -130,6 +134,28 @@ class ISO9660:
                         pass # skip trying to load filename that's not a valid string
                 i += next_len
         return files
+
+# get args from user interactively
+def get_args_interactive(argv):
+    # set things up
+    print_log("=== GameID v%s ===" % VERSION)
+    arg_input = None; arg_console = None
+
+    # get game filename (--input)
+    while arg_input is None:
+        print_log("Enter game title (no quotes): ", end='')
+        arg_input = input().strip()
+        if not isfile(arg_input):
+            print_log("ERROR: File not found: %s\n" % arg_input); arg_input = None
+    argv += ['--input', arg_input]
+
+    # get console (--console)
+    while arg_console is None:
+        print_log("Enter console (options: %s): " % ', '.join(sorted(IDENTIFY.keys())), end='')
+        arg_console = input().replace('"','').replace("'",'').strip()
+        if arg_console not in IDENTIFY:
+            print_log("ERROR: Invalid console: %s\n" % arg_console); arg_console = None
+    argv += ['--console', arg_console]
 
 # parse user arguments
 def parse_args():
@@ -312,4 +338,6 @@ def main():
 
 # run program
 if __name__ == "__main__":
+    if len(argv) == 1:
+        get_args_interactive(argv)
     main()
