@@ -13,7 +13,7 @@ from sys import argv, stderr
 import argparse
 
 # useful constants
-VERSION = '1.0.3'
+VERSION = '1.0.4'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -86,6 +86,14 @@ class ISO9660:
         # read PVD: https://wiki.osdev.org/ISO_9660#The_Primary_Volume_Descriptor
         self.f.seek(self.block_offset + (16 * self.block_size)); self.pvd = self.f.read(2048)
 
+    # get system ID
+    def get_system_ID(self):
+        system_ID = self.pvd[8 : 40]
+        try:
+            return system_ID.decode().strip()
+        except:
+            return system_ID
+
     # get volume ID
     def get_volume_ID(self):
         volume_ID = self.pvd[40 : 72]
@@ -93,6 +101,42 @@ class ISO9660:
             return volume_ID.decode().strip()
         except:
             return volume_ID
+
+    # get publisher ID
+    def get_publisher_ID(self):
+        publisher_ID = self.pvd[318 : 446]
+        try:
+            return publisher_ID.decode().strip()
+        except:
+            return publisher_ID
+
+    # get data preparer ID
+    def get_data_preparer_ID(self):
+        data_preparer_ID = self.pvd[446 : 574]
+        try:
+            return data_preparer_ID.decode().strip()
+        except:
+            return data_preparer_ID
+
+    # get volume creation date + time
+    def get_volume_creation_date_time(self):
+        volume_creation_date_time = self.pvd[813 : 830]
+        return volume_creation_date_time # TODO PARSE
+
+    # get volume modification date + time
+    def get_volume_modification_date_time(self):
+        volume_modification_date_time = self.pvd[830 : 847]
+        return volume_modification_date_time # TODO PARSE
+
+    # get volume expiration date + time
+    def get_volume_expiration_date_time(self):
+        volume_expiration_date_time = self.pvd[847 : 864]
+        return volume_expiration_date_time # TODO PARSE
+
+    # get volume effective date + time
+    def get_volume_effective_date_time(self):
+        volume_effective_date_time = self.pvd[864 : 881]
+        return volume_effective_date_time # TODO PARSE
 
     # parse filenames: https://wiki.osdev.org/ISO_9660#Recursing_from_the_Root_Directory
     def get_filenames(self, only_root_dir=True):
