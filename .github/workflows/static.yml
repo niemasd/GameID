@@ -38,14 +38,14 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Copy over static content
         run: |
-            cp ../GameID.py ./assets/ \
-            cp ../README.md ./assets/ \
-            cp ../db.pkl.gz ./assets/ \
+          cp ../GameID.py ./assets/ && \
+          cp ../README.md ./assets/ && \
+          cp ../db.pkl.gz ./assets/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          path: '.'
+          path: './website/'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
