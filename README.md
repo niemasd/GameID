@@ -45,4 +45,5 @@ rm -f db.pkl.gz && ./scripts/build_db.py db.pkl.gz
 
 ## Acknowledgements
 
-Thanks to [MiSTer Addons](https://misteraddons.com/) for the idea and for help with testing!
+* Thanks to [MiSTer Addons](https://misteraddons.com/) for the idea and for help with testing!
+* Thanks to [Artemio Urbina](https://junkerhq.net/) and the other developers of the [240p Test Suite](https://artemiourbina.itch.io/240p-test-suite), which we use as an example file!
