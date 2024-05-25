@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+
+<head>
+	<!-- bootstrap 5.3.3 -->
+	<link href="assets/bootstrap.min.css" rel="stylesheet">
+	<!-- pyodide v0.25.1 -->
+	<script src="assets/pyodide/pyodide.js"></script>
+	<script src="assets/marked.min.js"></script>
+	<style>
+		#container {
+			margin: 0 auto;
+			width: 90%;
+		}
+
+		#input,
+		#output {
+			width: 47.5%;
+		}
+
+		#input-border,
+		#output-table,
+		#output-table {
+			border: 2px solid black;
+		}
+
+		#output-table td {
+			border-width: 2px;
+		}
+
+		#input-file,
+		#input-format {
+			min-width: 200px;
+			width: 75%;
+		}
+
+		#readme {
+			margin: 0 auto;
+			width: 90%;
+		}
+	</style>
+</head>
+
+<body>
+	<h1 id="title" class="my-4 w-100 text-center">GameID</h1>
+	<div id="container" class="d-flex justify-content-between">
+		<div id="input" class="mt-3">
+			<h3 class="mb-3">Input</h3>
+			<div id="input-border" class="p-3 w-100">
+				<!-- specific files to accept? -->
+				<label for="input-file" class="form-label">
+					<h5>Game File</h5>
+				</label>
+				<input id="input-file" type="file" class="form-control">
+				<label for="input-format" class="form-label mt-3">
+					<h5>Game Console</h5>
+				</label>
+				<select id="input-format" class="form-select mb-3">
+					<option value="" selected disabled>Select Console</option>
+				</select>
+				<button id="run" class="btn btn-primary mt-2 mb-3" disabled>Loading...</button>
+			</div>
+		</div>
+		<div id="output" class="mt-3">
+			<h3 class="mb-3">Output</h3>
+			<table id="output-table" class="table table-bordered">
+				<tbody id="output-table-body">
+					<tr>
+						<td>Title</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>Developer</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>Publisher</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>Rating</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>Region</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>Release Date</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>ID</td>
+						<td></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+	<div id="readme" class="mt-3 mb-5">
+		<!-- Dynamically generated README.md -->
+	</div>
+	<script type="module">
+		const PYODIDE_ROOT = "/home/pyodide/";
+		const INPUT_FILENAME = 'input';
+
+		const gameIDPy = await(await fetch('assets/GameID.py')).text();
+		const gameIDWebPy = await(await fetch('assets/GameIDWeb.py')).text();
+
+		getVariables(gameIDPy);
+		getREADME();
+
+		const pyodide = await loadPyodideAndGameID();
+
+		document.getElementById('run').innerText = 'Run';
+		document.getElementById('run').disabled = false;
+
+		addEventListeners();
+
+		async function loadPyodideAndGameID() {
+			const pyodide = await loadPyodide({
+				indexURL: 'assets/pyodide/',
+			});
+
+			pyodide.setStdout({
+				batched: (x) => {
+					const outputTableBody = document.getElementById('output-table-body');
+					const tr = document.createElement('tr');
+					const columns = x.split('\t');
+					columns[0] = columns[0].replace(/_/g, ' '); // replace underscores with spaces
+					columns[0] = columns[0].split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '); // convert to title case
+					for (const column of columns) {
+						const td = document.createElement('td');
+						td.innerText = column;
+						tr.appendChild(td);
+					}
+					outputTableBody.appendChild(tr);
+				}
+			})
+			// write database to Pyodide FS
+			pyodide.FS.writeFile(PYODIDE_ROOT + 'db.pkl.gz', new Uint8Array(await (await fetch('assets/db.pkl.gz')).arrayBuffer()));
+
+			// write the python code to Pyodide FS
+			pyodide.FS.writeFile(PYODIDE_ROOT + 'GameID.py', gameIDPy);
+
+			return pyodide;
+		}
+
+		function addEventListeners() {
+			document.getElementById('run').addEventListener('click', async () => {
+				const file = document.getElementById('input-file').files[0];
+				const format = document.getElementById('input-format').value;
+				let error = false;
+
+				if (!file) {
+					document.getElementById('input-file').classList.add('is-invalid');
+					error = true;
+				} else {
+					document.getElementById('input-file').classList.remove('is-invalid');
+				}
+
+				if (!format) {
+					document.getElementById('input-format').classList.add('is-invalid');
+					error = true;
+				} else {
+					document.getElementById('input-format').classList.remove('is-invalid');
+				}
+
+				if (error) {
+					return;
+				}
+
+				// update run button
+				document.getElementById('run').innerText = 'Running...';
+				document.getElementById('run').disabled = true;
+				document.getElementById('output-table-body').innerHTML = '';
+
+				const fileReader = new FileReader();
+				fileReader.onload = async () => {
+					const fileData = new Uint8Array(fileReader.result);
+
+					// delete the old input file
+					if (pyodide.FS.analyzePath(PYODIDE_ROOT + INPUT_FILENAME).exists) {
+						pyodide.FS.unlink(PYODIDE_ROOT + INPUT_FILENAME);
+					}
+
+					// write test file to Pyodide FS
+					pyodide.FS.writeFile(PYODIDE_ROOT + INPUT_FILENAME, fileData, {
+						encoding: 'binary'
+					});
+
+					// set args (to monkey patch sys.argv)
+					pyodide.globals.set('args', `./GameID.py -i ${INPUT_FILENAME} -c ${format} -d db.pkl.gz`);
+
+					// run the python code
+					try {
+						pyodide.runPython(gameIDWebPy);
+					} catch (e) {
+						alert("An error occurred. Ensure the input file is correct and try again.");
+						document.getElementById('run').innerText = 'Run';
+						document.getElementById('run').disabled = false;
+						return;
+					}
+
+					// update output
+					document.getElementById('run').innerText = 'Run';
+					document.getElementById('run').disabled = false;
+				};
+
+				fileReader.readAsArrayBuffer(file);
+			});
+
+			document.getElementById('input-file').addEventListener('change', () => {
+				document.getElementById('input-file').classList.remove('is-invalid');
+			});
+
+			document.getElementById('input-format').addEventListener('change', () => {
+				document.getElementById('input-format').classList.remove('is-invalid');
+			});
+		}
+
+		function getVariables(gameIDPy) {
+			// sets the title of the page to the version of the python code
+			const version = gameIDPy.match(/\nVERSION\s*=\s*'(\d+(\.\d+)*)'/)
+			document.getElementById('title').innerText = `GameID v${version[1]}`;
+
+			// gets the IDENTIFY dictionary from the python code
+			const consoleList = gameIDPy.match(/IDENTIFY\s*=\s*\{(\s*\n.*)*\s*\n\}/)[0]
+			// sets the dropdown list of consoles from the IDENTIFY dictionary
+			const consoles = consoleList.match(/['"](.*?)['"]:/g).map(key => key.slice(1, -2)).sort();
+			for (const console of consoles) {
+				const option = document.createElement('option');
+				option.value = console;
+				option.innerText = console;
+				document.getElementById('input-format').appendChild(option);
+			}
+		}
+
+		async function getREADME() {
+			// fetches the README.md file 
+			let README = (await (await fetch('assets/README.md')).text()).split('\n## ')
+			// only gets the start of the README.md (about the project, supported consoles) and end of the README.md (Acknowledgements)
+			// a bit hacky, may have to adjust as README.md changes
+			README = [README[0], README[2]];
+			README[0] = '#' + README[0];
+			README[1] = '### ' + README[1];
+			document.getElementById('readme').innerHTML = marked.parse(README.join('\n'));
+		}
+	</script>
+</body>
+
+</html>
