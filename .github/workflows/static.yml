@@ -40,7 +40,8 @@ jobs:
         run: |
           cp ../GameID.py ./assets/ && \
           cp ../README.md ./assets/ && \
-          cp ../db.pkl.gz ./assets/
+          cp ../db.pkl.gz ./assets/ && \
+          cp ../example/GameCube-240pSuite-1.17.iso ./assets/ 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
