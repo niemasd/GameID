@@ -248,7 +248,8 @@ def load_db(fn, bufsize=DEFAULT_BUFSIZE):
 
 # identify PSX game
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
-    iso = ISO9660(fn, console)
+    # set things up
+    iso = ISO9660(fn, console); out = None; serial = None
 
     # try to find file in root directory with name SXXX_XXX.XX
     root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len in iso.get_filenames(only_root_dir=True)]
@@ -259,21 +260,28 @@ def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
                 if serial not in db[console] and len(serial) > len(prefix): # might have a different delimiter than '-' or '_' (e.g. DQ7 is 'SLUSP012.06)
                     serial = serial[:len(prefix)] + '_' + serial[len(prefix)+1:]
                 if serial in db[console]:
-                    out = db[console][serial]
-                    out['ID'] = serial
-                    return out
+                    out = db[console][serial]; break
+        if serial is not None:
+            break
 
     # failed to find serial based on file, so try volume ID
-    volume_ID = iso.get_volume_ID()
-    if isinstance(volume_ID, str):
-        serial = volume_ID.replace('-','_'); num_underscore = serial.count('_')
-        if num_underscore == 2:
-            serial = '_'.join(serial.split('_')[:2])
-        if serial in db[console]:
-            out = db[console][serial]
-            out['ID'] = serial
-            return out
-    error("%s game not found (%s): %s\t%s" % (console, volume_ID, fn, root_fns))
+    if out is None:
+        volume_ID = iso.get_volume_ID()
+        if isinstance(volume_ID, str):
+            serial = volume_ID.replace('-','_'); num_underscore = serial.count('_')
+            if num_underscore == 2:
+                serial = '_'.join(serial.split('_')[:2])
+            if serial in db[console]:
+                out = db[console][serial]
+
+    # finalize output and return
+    if out is None:
+        error("%s game not found (%s): %s\t%s" % (console, volume_ID, fn, root_fns))
+    else:
+        out['ID'] = serial
+        if not prefer_gamedb:
+            out['uuid'] = iso.get_uuid()
+        return out
 
 # identify PSX game
 def identify_psx(fn, db, prefer_gamedb=False):
