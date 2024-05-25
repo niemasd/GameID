@@ -1,0 +1,4 @@
+# Files are already in repository, copied over so the site can access them
+# During deployment of the site, the GH action copies the files from the repository to the site
+GameID.py
+README.md
