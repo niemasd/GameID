@@ -1,0 +1,314 @@
+<!doctype html>
+<html>
+
+<head>
+	<!-- favicon -->
+	<link rel="icon" type="image/x-icon" href="favicon.ico">
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+		integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+	<style>
+		body {
+			font-family: monospace;
+		}
+
+		#container {
+			margin: 0 auto;
+			width: 90%;
+		}
+
+		#input,
+		#output {
+			width: 100%;
+		}
+
+		#input-border,
+		#output-table,
+		#output-table {
+			border: 2px solid black;
+		}
+
+		#output-table td {
+			border-width: 2px;
+		}
+
+		#input-file,
+		#input-format {
+			width: 90%;
+		}
+
+		#readme {
+			margin: 0 auto;
+			width: 90%;
+		}
+	</style>
+</head>
+
+<body>
+	<h1 id="title" class="mt-5 w-100 text-center">GameID</h1>
+	<div id="container" class="d-flex flex-column">
+		<div id="input" class="mt-3">
+			<h3 class="mb-3">Input</h3>
+			<div id="input-border" class="py-3 px-4 w-100">
+				<div id="input-placeholder" class="my-2">
+					Site is loading
+				</div>
+				<div id="input-content" class="w-100 d-none">
+					<div class="my-3 d-flex justify-content-evenly">
+						<div class="w-50">
+							<label for="input-file" class="form-label">
+								<h5>Game File</h5>
+							</label>
+							<input id="input-file" type="file" class="form-control">
+						</div>
+						<div class="w-50">
+							<label for="input-format" class="form-label">
+								<h5>Game Console</h5>
+							</label>
+							<select id="input-format" class="form-select mb-3">
+								<option value="" selected disabled>Select Console</option>
+							</select>
+						</div>
+					</div>
+					<div class="mt-2 mb-3">
+						<button id="run" class="btn btn-primary">Run</button>
+						<button id="load-example" class="btn btn-secondary ms-3">Load Example File</button>
+					</div>
+					<p class="mt-2 small">Note: <a href="https://artemiourbina.itch.io/240p-test-suite"
+							target="_blank">Example file</a> is a GameCube ISO of 240p Test Suite v1.17.</p>
+				</div>
+			</div>
+		</div>
+		<div id="output" class="mt-4">
+			<h3 class="mb-3">Output</h3>
+			<table id="output-table" class="table table-bordered">
+				<tbody id="output-table-body">
+					<tr>
+						<td class="p-4">Game metadata will appear here!</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+	<div id="readme" class="mt-3 mb-5">
+		<!-- Dynamically generated README.md -->
+	</div>
+	<script>
+		// Put before everything else to ensure maximal user feedback / site responsiveness
+		// Site loading animation in input box
+		const loadingDotsAnimation = () => {
+			if (document.getElementById('input-placeholder').classList.contains('d-none')) {
+				clearInterval(loadingDotsAnimation);
+			}
+
+			const currentDots = document.getElementById('input-placeholder').innerText.match(/\./g);
+			const dots = currentDots ? currentDots.length : 0;
+			document.getElementById('input-placeholder').innerText = 'Site is loading' + '.'.repeat((dots + 1) % 4);
+		}
+
+		setInterval(loadingDotsAnimation, 500);
+	</script>
+	<script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+	<script type="module">
+		const PYODIDE_ROOT = "/home/pyodide/";
+		const INPUT_FOLDER = "input/";
+		const OUTPUT_FILE = "output.tsv";
+		const EXAMPLE_FILE_NAME = "GameCube-240pSuite-1.17.iso";
+		let exampleFile = null; // load example file later if needed
+		let usingExampleFile = false;
+
+		getREADME(); // async function that can be run in parallel with other code
+		const gameIDPy = await(await fetch('assets/GameID.py')).text();
+		const gameIDWebPy = await(await fetch('assets/GameIDWeb.py')).text();
+		getVariables(gameIDPy);
+
+		const pyodide = await loadPyodideAndGameID();
+
+		// after site is loaded
+		document.getElementById('input-placeholder').classList.add('d-none');
+		document.getElementById('input-content').classList.remove('d-none');
+		addEventListeners();
+
+		function getVariables(gameIDPy) {
+			// sets the title of the page to the version of the python code
+			const version = gameIDPy.match(/\nVERSION\s*=\s*'(\d+(\.\d+)*)'/)
+			document.getElementById('title').innerText = `GameID v${version[1]}`;
+
+			// gets the IDENTIFY dictionary from the python code
+			const consoleList = gameIDPy.match(/IDENTIFY\s*=\s*\{(\s*\n.*)*\s*\n\}/)[0]
+			// sets the dropdown list of consoles from the IDENTIFY dictionary
+			const consoles = consoleList.match(/['"](.*?)['"]:/g).map(key => key.slice(1, -2)).sort();
+			for (const console of consoles) {
+				const option = document.createElement('option');
+				option.value = console;
+				option.innerText = console;
+				document.getElementById('input-format').appendChild(option);
+			}
+		}
+
+		// NOTE: Expects last H2 header to be "Acknowledgements" and content before first H2 header to be "About the project"
+		async function getREADME() {
+			// fetches the README.md file 
+			let README = (await (await fetch('assets/README.md')).text()).split('\n## ')
+			README = [README[0], README[2]];
+			README[0] = '#' + README[0];
+			README[1] = '### ' + README[1];
+			document.getElementById('readme').innerHTML = marked.parse(README.join('\n')).replaceAll('<a ', '<a target="_blank" ');
+		}
+
+		async function loadPyodideAndGameID() {
+			const pyodide = await loadPyodide();
+
+			// install dependencies
+			await pyodide.loadPackage('micropip');
+			const micropip = pyodide.pyimport('micropip');
+			await micropip.install('assets/gciso-0.1-py3-none-any.whl');
+
+			// write database to Pyodide FS
+			pyodide.FS.writeFile(PYODIDE_ROOT + 'db.pkl.gz', new Uint8Array(await (await fetch('assets/db.pkl.gz')).arrayBuffer()));
+
+			// write the python code to Pyodide FS
+			pyodide.FS.writeFile(PYODIDE_ROOT + 'GameID.py', gameIDPy);
+
+			// create input folder
+			pyodide.FS.mkdir(PYODIDE_ROOT + INPUT_FOLDER);
+
+			return pyodide;
+		}
+
+		function addEventListeners() {
+			document.getElementById('run').addEventListener('click', async () => {
+				const file = document.getElementById('input-file').files[0];
+				const format = document.getElementById('input-format').value;
+				let error = false;
+
+				// error handling
+				if (!file && !usingExampleFile) {
+					document.getElementById('input-file').classList.add('is-invalid');
+					error = true;
+				} else {
+					document.getElementById('input-file').classList.remove('is-invalid');
+				}
+
+				if (!format) {
+					document.getElementById('input-format').classList.add('is-invalid');
+					error = true;
+				} else {
+					document.getElementById('input-format').classList.remove('is-invalid');
+				}
+
+				if (error) {
+					return;
+				}
+
+				// update run button
+				document.getElementById('run').innerText = 'Running...';
+				document.getElementById('run').disabled = true;
+				document.getElementById('output-table-body').innerHTML = '';
+
+				if (usingExampleFile) {
+					runGameID(exampleFile, EXAMPLE_FILE_NAME, format);
+					return;
+				}
+
+				const fileReader = new FileReader();
+				fileReader.onload = async () => {
+					const fileData = new Uint8Array(fileReader.result);
+
+					runGameID(fileData, file.name, format);
+				};
+
+				fileReader.readAsArrayBuffer(file);
+			});
+
+			// remove the error class when the user selects a file
+			document.getElementById('input-file').addEventListener('change', () => {
+				document.getElementById('input-file').classList.remove('is-invalid');
+				if (usingExampleFile) {
+					document.getElementById('load-example').classList.remove('btn-success');
+					document.getElementById('load-example').classList.add('btn-secondary');
+					document.getElementById('load-example').innerText = 'Load Example File';
+					usingExampleFile = false;
+				}
+			});
+
+			// remove the error class when the user selects a console
+			document.getElementById('input-format').addEventListener('change', () => {
+				document.getElementById('input-format').classList.remove('is-invalid');
+			});
+
+			// load the example file
+			document.getElementById('load-example').addEventListener('click', async () => {
+				if (exampleFile === null) {
+					exampleFile = new Uint8Array(await (await fetch('assets/' + EXAMPLE_FILE_NAME)).arrayBuffer());
+				}
+
+				document.getElementById('input-format').value = 'GC';
+				document.getElementById('input-format').classList.remove('is-invalid');
+				document.getElementById('input-file').classList.remove('is-invalid');
+				document.getElementById('load-example').classList.add('btn-success');
+				document.getElementById('load-example').classList.remove('btn-secondary');
+				document.getElementById('load-example').innerText = 'Using Example File!';
+				usingExampleFile = true;
+			});
+		}
+
+		function runGameID(fileData, fileName, format) {
+			// delete everything in the input folder
+			for (const file of pyodide.FS.readdir(PYODIDE_ROOT + INPUT_FOLDER)) {
+				if (file !== '.' && file !== '..') {
+					pyodide.FS.unlink(PYODIDE_ROOT + INPUT_FOLDER + file);
+				}
+			}
+
+			// remove output file data
+			if (pyodide.FS.analyzePath(PYODIDE_ROOT + OUTPUT_FILE).exists) {
+				pyodide.FS.unlink(PYODIDE_ROOT + OUTPUT_FILE);
+			}
+
+			// write test file to Pyodide FS
+			pyodide.FS.writeFile(PYODIDE_ROOT + INPUT_FOLDER + fileName, fileData, {
+				encoding: 'binary'
+			});
+
+			// set args (to monkey patch sys.argv)
+			pyodide.globals.set('args', `./GameID.py -i ${INPUT_FOLDER + fileName} -c ${format} -d db.pkl.gz -o ${OUTPUT_FILE}`);
+
+			// run the python code
+			try {
+				pyodide.runPython(gameIDWebPy);
+			} catch (e) {
+				alert("An error occurred. Ensure the input file is correct and try again.");
+				document.getElementById('run').innerText = 'Run';
+				document.getElementById('run').disabled = false;
+				return;
+			}
+
+			// read the output file
+			const output = pyodide.FS.readFile(PYODIDE_ROOT + OUTPUT_FILE, { encoding: 'utf8' });
+			const lines = output.split('\n');
+			if (lines[lines.length - 1] === '') {
+				lines.pop();
+			}
+			for (const line of lines) {
+				// parse each line and add elements in the output table
+				const outputTableBody = document.getElementById('output-table-body');
+				const tr = document.createElement('tr');
+				const columns = line.split('\t');
+				for (const column of columns) {
+					const td = document.createElement('td');
+					td.classList.add('ps-3')
+					td.innerText = column;
+					tr.appendChild(td);
+				}
+				outputTableBody.appendChild(tr);
+			}
+
+			// update output
+			document.getElementById('run').innerText = 'Run';
+			document.getElementById('run').disabled = false;
+		}
+	</script>
+</body>
+
+</html>

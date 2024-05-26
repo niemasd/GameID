@@ -10,7 +10,8 @@ from gzip import open as gopen
 from os.path import abspath, expanduser, getsize, isfile
 from pickle import loads as ploads
 from struct import unpack
-from sys import argv, stderr
+from sys import stderr
+import sys
 import argparse
 
 # useful constants
@@ -209,7 +210,7 @@ def get_args_interactive(argv):
 # parse user arguments
 def parse_args():
     # if --version, just print version and exit
-    if '--version' in argv:
+    if '--version' in sys.argv:
         print("GameID v%s" % VERSION); exit()
 
     # run argparse
@@ -483,6 +484,6 @@ def main():
 
 # run program
 if __name__ == "__main__":
-    if len(argv) == 1:
-        get_args_interactive(argv)
+    if len(sys.argv) == 1:
+        get_args_interactive(sys.argv)
     main()
