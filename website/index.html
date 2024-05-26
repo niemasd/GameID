@@ -92,7 +92,9 @@
 	</div>
 	<script type="module">
 		const PYODIDE_ROOT = "/home/pyodide/";
-		const INPUT_FILENAME = 'input';
+		const INPUT_FOLDER = "input/";
+		const OUTPUT_FILE = "output.tsv";
+		const EXAMPLE_FILE_NAME = "GameCube-240pSuite-1.17.iso";
 		let exampleFile = null; // load example file later if needed
 		let usingExampleFile = false;
 
@@ -143,26 +145,14 @@
 			const micropip = pyodide.pyimport('micropip');
 			await micropip.install('assets/gciso-0.1-py3-none-any.whl');
 
-			pyodide.setStdout({
-				batched: (x) => {
-					// parse the output and add elements in the output table
-					const outputTableBody = document.getElementById('output-table-body');
-					const tr = document.createElement('tr');
-					const columns = x.split('\t');
-					for (const column of columns) {
-						const td = document.createElement('td');
-						td.classList.add('ps-3')
-						td.innerText = column;
-						tr.appendChild(td);
-					}
-					outputTableBody.appendChild(tr);
-				}
-			})
 			// write database to Pyodide FS
 			pyodide.FS.writeFile(PYODIDE_ROOT + 'db.pkl.gz', new Uint8Array(await (await fetch('assets/db.pkl.gz')).arrayBuffer()));
 
 			// write the python code to Pyodide FS
 			pyodide.FS.writeFile(PYODIDE_ROOT + 'GameID.py', gameIDPy);
+
+			// create input folder
+			pyodide.FS.mkdir(PYODIDE_ROOT + INPUT_FOLDER);
 
 			return pyodide;
 		}
@@ -198,7 +188,7 @@
 				document.getElementById('output-table-body').innerHTML = '';
 
 				if (usingExampleFile) {
-					runGameID(exampleFile, format);
+					runGameID(exampleFile, EXAMPLE_FILE_NAME, format);
 					return;
 				}
 
@@ -206,7 +196,7 @@
 				fileReader.onload = async () => {
 					const fileData = new Uint8Array(fileReader.result);
 
-					runGameID(fileData, format);
+					runGameID(fileData, file.name, format);
 				};
 
 				fileReader.readAsArrayBuffer(file);
@@ -231,7 +221,7 @@
 			// load the example file
 			document.getElementById('load-example').addEventListener('click', async () => {
 				if (exampleFile === null) {
-					exampleFile = new Uint8Array(await (await fetch('assets/GameCube-240pSuite-1.17.iso')).arrayBuffer());
+					exampleFile = new Uint8Array(await (await fetch('assets/' + EXAMPLE_FILE_NAME)).arrayBuffer());
 				}
 
 				document.getElementById('input-format').value = 'GC';
@@ -244,19 +234,26 @@
 			});
 		}
 
-		function runGameID(fileData, format) {
-			// delete the old input file
-			if (pyodide.FS.analyzePath(PYODIDE_ROOT + INPUT_FILENAME).exists) {
-				pyodide.FS.unlink(PYODIDE_ROOT + INPUT_FILENAME);
+		function runGameID(fileData, fileName, format) {
+			// delete everything in the input folder
+			for (const file of pyodide.FS.readdir(PYODIDE_ROOT + INPUT_FOLDER)) {
+				if (file !== '.' && file !== '..') {
+					pyodide.FS.unlink(PYODIDE_ROOT + INPUT_FOLDER + file);
+				}
+			}
+
+			// remove output file data
+			if (pyodide.FS.analyzePath(PYODIDE_ROOT + OUTPUT_FILE).exists) {
+				pyodide.FS.unlink(PYODIDE_ROOT + OUTPUT_FILE);
 			}
 
 			// write test file to Pyodide FS
-			pyodide.FS.writeFile(PYODIDE_ROOT + INPUT_FILENAME, fileData, {
+			pyodide.FS.writeFile(PYODIDE_ROOT + INPUT_FOLDER + fileName, fileData, {
 				encoding: 'binary'
 			});
 
 			// set args (to monkey patch sys.argv)
-			pyodide.globals.set('args', `./GameID.py -i ${INPUT_FILENAME} -c ${format} -d db.pkl.gz`);
+			pyodide.globals.set('args', `./GameID.py -i ${INPUT_FOLDER + fileName} -c ${format} -d db.pkl.gz -o ${OUTPUT_FILE}`);
 
 			// run the python code
 			try {
@@ -266,6 +263,22 @@
 				document.getElementById('run').innerText = 'Run';
 				document.getElementById('run').disabled = false;
 				return;
+			}
+
+			// read the output file
+			const output = pyodide.FS.readFile(PYODIDE_ROOT + OUTPUT_FILE, { encoding: 'utf8' });
+			for (const line of output.split('\n')) {
+				// parse each line and add elements in the output table
+				const outputTableBody = document.getElementById('output-table-body');
+				const tr = document.createElement('tr');
+				const columns = line.split('\t');
+				for (const column of columns) {
+					const td = document.createElement('td');
+					td.classList.add('ps-3')
+					td.innerText = column;
+					tr.appendChild(td);
+				}
+				outputTableBody.appendChild(tr);
 			}
 
 			// update output
