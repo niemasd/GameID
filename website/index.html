@@ -133,7 +133,8 @@
 		function getVariables(gameIDPy) {
 			// sets the title of the page to the version of the python code
 			const version = gameIDPy.match(/\nVERSION\s*=\s*'(\d+(\.\d+)*)'/)
-			document.getElementById('title').innerText = `GameID v${version[1]}`;
+			document.title = `GameID v${version[1]}`;
+			document.getElementById('title').innerText = document.title;
 
 			// gets the IDENTIFY dictionary from the python code
 			const consoleList = gameIDPy.match(/IDENTIFY\s*=\s*\{(\s*\n.*)*\s*\n\}/)[0]
