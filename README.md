@@ -7,9 +7,9 @@ Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported con
 * `PS2` - Sony PlayStation 2
 * `SNES` - Super Nintendo Entertainment System
 
-This tool is being actively developed, and updates will be pushed somewhat frequently. As such, be sure to periodically `git pull` an up-to-date version of this repository to ensure you have access to all of the latest features and optimizations.
-
 ## Usage
+
+For manually checking individual games, we recommend using the [GameID web app](https://niema.net/GameID). For bulk/programmatic lookups, we recommend using the command line Python script, [`GameID.py`](GameID.py):
 
 ```
 usage: GameID.py [-h] -i INPUT -c CONSOLE [-d DATABASE] [-o OUTPUT] [--delimiter DELIMITER] [--prefer_gamedb]
@@ -25,6 +25,8 @@ options:
 ```
 
 If the database ([`db.pkl.gz`](db.pkl.gz)) is not provided via `-d`, it will be downloaded from this repo. This is **very slow**, so we strongly recommend providing it if you are running GameID in bulk (or if your environment does not have internet connection).
+
+This tool is being actively developed, and updates will be pushed somewhat frequently. As such, be sure to periodically `git pull` an up-to-date version of this repository to ensure you have access to all of the latest features and optimizations.
 
 ### Example: Identify a Game
 
