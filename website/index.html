@@ -76,6 +76,7 @@
 					</div>
 					<p class="mt-2 small">Note: <a href="https://artemiourbina.itch.io/240p-test-suite"
 							target="_blank">Example file</a> is a GameCube ISO of 240p Test Suite v1.17.</p>
+					<p class="mt-2 small">Note: For BIN/CUE games, select the BIN file. If there are multiple BINs, select the first track.</p>
 				</div>
 			</div>
 		</div>
@@ -283,7 +284,11 @@
 			try {
 				pyodide.runPython(gameIDWebPy);
 			} catch (e) {
-				alert("An error occurred. Ensure the input file is correct and try again.");
+				if(fileName.endsWith(".cue") || fileName.endsWith(".cue.gz")) {
+					alert("For BIN/CUE games, select the BIN file. If there are multiple BINs, select the first track.");
+				} else {
+					alert("An error occurred. Ensure the input file is correct and try again.");
+				}
 				document.getElementById('run').innerText = 'Run';
 				document.getElementById('run').disabled = false;
 				return;
