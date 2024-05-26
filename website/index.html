@@ -255,7 +255,7 @@
 
 		function runGameID(fileData, fileName, format) {
             // replace spaces in fileName with underscore (otherwise GameID.py's -i argument fails)
-            fileName = fileName.replace(' ','_')
+            fileName = fileName.replaceAll(' ','_')
 
 			// delete everything in the input folder
 			for (const file of pyodide.FS.readdir(PYODIDE_ROOT + INPUT_FOLDER)) {
