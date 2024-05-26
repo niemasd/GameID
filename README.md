@@ -5,6 +5,7 @@ Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported con
 * `N64` - Nintendo 64
 * `PSX` - Sony PlayStation
 * `PS2` - Sony PlayStation 2
+* `SNES` - Super Nintendo Entertainment System
 
 This tool is being actively developed, and updates will be pushed somewhat frequently. As such, be sure to periodically `git pull` an up-to-date version of this repository to ensure you have access to all of the latest features and optimizations.
 
@@ -47,4 +48,5 @@ rm -f db.pkl.gz && ./scripts/build_db.py db.pkl.gz
 
 * Thanks to [MiSTer Addons](https://misteraddons.com/) for the idea and for help with testing!
 * Thanks to [Artemio Urbina](https://junkerhq.net/) and the other developers of the [240p Test Suite](https://artemiourbina.itch.io/240p-test-suite), which we use as an example file!
+* Thanks to [Daniel Ji](https://github.com/daniel-ji) for creating the Pyodide web app!
 * Site favicon by open source project [Twemoji](https://github.com/twitter/twemoji") licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
