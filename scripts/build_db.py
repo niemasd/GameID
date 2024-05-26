@@ -11,7 +11,7 @@ from sys import argv
 from urllib.request import urlopen
 
 # constants
-CONSOLES = {'GC', 'N64', 'PSX', 'PS2'}
+CONSOLES = {'GC', 'N64', 'PSX', 'PS2', 'SNES'}
 
 # get GameDB URL
 def get_url(console):
@@ -73,6 +73,10 @@ if __name__ == "__main__":
                 counts[prefix] = 0
             counts[prefix] += 1
         db['GAMEID'][console]['ID_PREFIXES'] = sorted(counts.keys(), key=lambda x: counts[x], reverse=True)
+
+    # fix SNES: keys = (developer_ID, internal_title, rom_version, checksum) tuples
+    print("Fixing SNES database...")
+    db['SNES'] = {(int(v['developer_ID'],0), v['internal_title'], int(v['rom_version'],0), int(v['checksum'],0)):v for k,v in db['SNES'].items()}
 
     # dump GameID database
     print("Writing GameID database: %s" % argv[1])

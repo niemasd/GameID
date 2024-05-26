@@ -15,7 +15,7 @@ import sys
 import argparse
 
 # useful constants
-VERSION = '1.0.4'
+VERSION = '1.0.5'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -443,8 +443,9 @@ def identify_snes(fn, db, prefer_gamedb=False):
             hardware = hardware.replace(" + Coprocessor", " + Coprocessor (%s)" % coprocessor)
 
     # identify game
+    gamedb_ID = (developer_ID, internal_name, rom_version, int(checksum,16))
     out = {
-        'title': internal_name,
+        'internal_title': internal_name,
         'fast_slow_rom': fast_slow_rom,
         'rom_type': rom_type,
         'developer_ID': hex(developer_ID)[2:],
@@ -453,8 +454,13 @@ def identify_snes(fn, db, prefer_gamedb=False):
     }
     if hardware is not None:
         out['hardware'] = hardware
-    if prefer_gamedb:
-        pass # TODO OVERWRITE WITH GAMEDB DATA
+    if gamedb_ID in db['SNES']:
+        gamedb_entry = db['SNES'][gamedb_ID]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    else:
+        out['title'] = internal_name # 'title' and 'internal_title' will be the same if game not found in GameDB
     return out
 
 # dictionary storing all identify functions
