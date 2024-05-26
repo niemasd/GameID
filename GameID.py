@@ -15,7 +15,7 @@ import sys
 import argparse
 
 # useful constants
-VERSION = '1.0.5'
+VERSION = '1.0.6'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -305,28 +305,36 @@ def identify_gc(fn, db, prefer_gamedb=False):
         error("Unable to import gciso. Install with: pip install git+https://github.com/pfirsich/gciso.git")
     iso = GCIsoFile(fn)
 
-    # identify game
+    # build initial output: https://gciso.readthedocs.io/en/latest/#gciso.IsoFile
     serial = iso.gameCode.decode()
+    out = {
+        'internal_title': iso.gameName.decode(),
+        'ID': serial,
+        'maker_code': iso.makerCode.decode(),
+        'disk_ID': iso.diskId,
+        'version': iso.version,
+        'dol_offset': iso.dolOffset,
+        'dol_size': iso.dolSize,
+        'fst_offset': iso.fstOffset,
+        'fst_size': iso.fstSize,
+        'max_fst_size': iso.maxFstSize,
+        'num_fst_entries': iso.numFstEntries,
+        'string_table_offset': iso.stringTableOffset,
+        'apploader_date': iso.apploaderDate.decode().replace('/','-'),
+        'apploader_entry_point': iso.apploaderEntryPoint,
+        'apploader_code_size': iso.apploaderCodeSize,
+        'apploader_trailer_size': iso.apploaderTrailerSize,
+    }
+
+    # identify game
     if serial in db['GC']:
-        out = db['GC'][serial]
-        out['ID'] = serial
-        if not prefer_gamedb: # https://gciso.readthedocs.io/en/latest/#gciso.IsoFile
-            out['maker_code'] = iso.makerCode.decode()
-            out['disk_ID'] = iso.diskId
-            out['version'] = iso.version
-            out['title'] = iso.gameName.decode()
-            out['dol_offset'] = iso.dolOffset
-            out['dol_size'] = iso.dolSize
-            out['fst_offset'] = iso.fstOffset
-            out['fst_size'] = iso.fstSize
-            out['max_fst_size'] = iso.maxFstSize
-            out['num_fst_entries'] = iso.numFstEntries
-            out['string_table_offset'] = iso.stringTableOffset
-            out['apploader_date'] = iso.apploaderDate.decode().replace('/','-')
-            out['apploader_entry_point'] = iso.apploaderEntryPoint
-            out['apploader_code_size'] = iso.apploaderCodeSize
-            out['apploader_trailer_size'] = iso.apploaderTrailerSize
-        return out
+        gamedb_entry = db['GC'][serial]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    else:
+        out['title'] = out['internal_title'] # 'title' and 'internal_title' will be the same if game not found in GameDB
+    return out
 
 # helper function convert N64 data between little-endian and big-endian
 def n64_convert_endianness(data):
