@@ -4,6 +4,8 @@
 *.gz
 *.iso
 *.n64
+*.sfc
+*.smc
 *.z64
 *games/
 

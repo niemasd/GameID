@@ -21,6 +21,8 @@ FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 ISO966O_UUID_TERMINATION = {ord('$'), ord('.')}
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
 N64_FIRST_WORD = b'\x80\x37\x12\x40'
+SNES_LOROM_HEADER_START = 0x7FC0
+SNES_HIROM_HEADER_START = 0xFFC0
 
 # print a log message
 def print_log(message='', end='\n', file=stderr):
@@ -365,12 +367,94 @@ def identify_n64(fn, db, prefer_gamedb=False):
         return out
     f.close(); error("N64 game not found (%s %s): %s" % (cartridge_ID, country_code, fn))
 
+# identify SNES game
+def identify_snes(fn, db, prefer_gamedb=False):
+    # load ROM and remove optional 512-byte header: https://snes.nesdev.org/wiki/ROM_file_formats#Detecting_Headered_ROM
+    f = open_file(fn, mode='rb'); data = f.read(); f.close()
+    if (len(data) % 1024) == 512:
+        data = data[512:]
+
+    # find header start: https://github.com/JonnyWalker/PySNES/blob/13ed51843ef391426ebecae643f955da232dcf33/venv/pysnes/cartrige.py#L71-L83
+    checksum = sum(data) & 0xFFFF # https://github.com/JonnyWalker/PySNES/blob/13ed51843ef391426ebecae643f955da232dcf33/venv/pysnes/cartrige.py#L61-L69
+    header_start =  None
+    for start_addr in [SNES_LOROM_HEADER_START, SNES_HIROM_HEADER_START]:
+        # https://github.com/JonnyWalker/PySNES/blob/13ed51843ef391426ebecae643f955da232dcf33/venv/pysnes/cartrige.py#L85-L99
+        cs1 = hex(data[start_addr + 30])[2:]
+        cs1 = (2 - len(cs1)) * "0" + cs1
+        cs2 = hex(data[start_addr + 31])[2:]
+        cs2 = (2 - len(cs2)) * "0" + cs2
+        checksum = cs2 + cs1
+        csc1 = hex(data[start_addr + 28])[2:]
+        csc1 = (2 - len(csc1)) * "0" + csc1
+        csc2 = hex(data[start_addr + 29])[2:]
+        csc2 = (2 - len(csc2)) * "0" + csc2
+        checksum_complement = csc2 + csc1
+        if (int(checksum, 16) + int(checksum_complement, 16) == 65535):
+            header_start = start_addr; break
+    if header_start is None:
+        error("Invalid SNES ROM: %s" % fn)
+
+    # parse SNES ROM header: https://snes.nesdev.org/wiki/ROM_header#Cartridge_header
+    header = data[header_start:]
+    internal_name = header[0 : 21]
+    try:
+        internal_name = internal_name.decode().strip()
+    except:
+        pass
+    developer_ID = header[26]
+    rom_version = header[27]
+
+    # https://en.wikibooks.org/wiki/Super_NES_Programming/SNES_memory_map#How_do_I_recognize_the_ROM_type?
+    if (header[21] & 0b00010000) == 0:
+        fast_slow_rom = 'SlowROM'
+    else:
+        fast_slow_rom = 'FastROM'
+    if (header[21] & 0b00000001) == 0:
+        rom_type = "LoROM"
+    else:
+        rom_type = "HiROM"
+    if (header[21] & 0b00000100) != 0:
+        rom_type = "Ex%s" % rom_type
+
+    # https://snes.nesdev.org/wiki/ROM_header#$FFD6
+    if header[22] <= 2: # [0x00, 0x01, 0x02]
+        hardware = ["ROM", "ROM + RAM", "ROM + RAM + Battery"][header[22]]
+    else:
+        tmp = hex(header[22]).lower() # $FFD6
+        coprocessor = None
+        if '3' <= tmp[-1] <= '6': # [0x?3, 0x?4, 0x?5, 0x?6]
+            hardware = ["ROM + Coprocessor", "ROM + Coprocessor + RAM", "ROM + Coprocessor + RAM + Battery", "ROM + Coprocessor + Battery"][int(tmp[-1])-3]
+        if '0' <= tmp[-2] <= '5': # [0x0?, 0x1?, 0x2?, 0x3?, 0x4?, 0x5?]
+            coprocessor = ["DSP", "GSU / SuperFX", "OBC1", "SA-1", "S-DD1", "S-RTC"][int(tmp[-2])]
+        elif tmp[-2] == 'e': # 0xe?
+            coprocessor = "Super Game Boy / Satellaview"
+        elif tmp[-2] == 'f': # 0xf?
+            tmp = hex(data[header_start-1]) # $FFBF
+            if (tmp[-2] == '0') and ('0' <= tmp[-1] <= '3'): # [0x00, 0x01, 0x02, 0x03]
+                coprocessor = ["SPC7110", "ST010 / ST011", "ST018", "CX4"][int(tmp[-1])]
+        hardware = hardware.replace(" + Coprocessor", " + Coprocessor (%s)" % coprocessor)
+
+    # identify game
+    out = {
+        'title': internal_name,
+        'fast_slow_rom': fast_slow_rom,
+        'rom_type': rom_type,
+        'hardware': hardware,
+        'developer_ID': hex(developer_ID)[2:],
+        'rom_version': rom_version,
+        'checksum': checksum,
+    }
+    if prefer_gamedb:
+        pass # TODO OVERWRITE WITH GAMEDB DATA
+    return out
+
 # dictionary storing all identify functions
 IDENTIFY = {
-    'GC':  identify_gc,
-    'N64': identify_n64,
-    'PSX': identify_psx,
-    'PS2': identify_ps2,
+    'GC':   identify_gc,
+    'N64':  identify_n64,
+    'PSX':  identify_psx,
+    'PS2':  identify_ps2,
+    'SNES': identify_snes,
 }
 
 # throw an error for unsupported consoles
