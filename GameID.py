@@ -15,7 +15,7 @@ import sys
 import argparse
 
 # useful constants
-VERSION = '1.0.7'
+VERSION = '1.0.8'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -389,8 +389,7 @@ def identify_snes(fn, db, prefer_gamedb=False):
         data = data[512:]
 
     # find header start: https://github.com/JonnyWalker/PySNES/blob/13ed51843ef391426ebecae643f955da232dcf33/venv/pysnes/cartrige.py#L71-L83
-    checksum = sum(data) & 0xFFFF # https://github.com/JonnyWalker/PySNES/blob/13ed51843ef391426ebecae643f955da232dcf33/venv/pysnes/cartrige.py#L61-L69
-    header_start =  None
+    checksum = None; header_start =  None
     try:
         for start_addr in [SNES_LOROM_HEADER_START, SNES_HIROM_HEADER_START]:
             # https://github.com/JonnyWalker/PySNES/blob/13ed51843ef391426ebecae643f955da232dcf33/venv/pysnes/cartrige.py#L85-L99
