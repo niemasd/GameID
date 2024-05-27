@@ -15,7 +15,7 @@ import sys
 import argparse
 
 # useful constants
-VERSION = '1.0.6'
+VERSION = '1.0.7'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -135,11 +135,14 @@ class ISO9660:
         except:
             return uuid
         try:
-            tmp = uuid[-2:] # last 2 characters are always(?) extra 00
+            tmp_start = uuid[:4] # first 4 characters should be year (but might be 0000 if year is 2000)
+            tmp_end = uuid[-2:] # last 2 characters are always(?) extra 00
             if uuid.startswith('0000'):
                 uuid = '2%s' % uuid[1:] # convert 0000MMDDHHMMSS to 2000MMDDHHMMSS (year 2000 sometimes shows up as 0000)
             uuid = datetime.strptime(uuid[:-2], "%Y%m%d%H%M%S")
-            uuid = uuid.strftime("%Y-%m-%d-%H-%M-%S-") + tmp # format as YYYY-MM-DD-HH-MM-SS-00
+            uuid = uuid.strftime("%Y-%m-%d-%H-%M-%S-") + tmp_end # format as YYYY-MM-DD-HH-MM-SS-00
+            if tmp_start == '0000':
+                uuid = '0%s' % uuid[1:] # revert back to 0000 instead of 2000 after confirming that it's a valid date/time
         except:
             return uuid
         return uuid
