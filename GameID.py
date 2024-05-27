@@ -486,8 +486,6 @@ def identify_snes(fn, db, prefer_gamedb=False):
 
 # dictionary storing all identify functions
 IDENTIFY = {
-    #'GB':   identify_gb,
-    #'GBC':  identify_gbc,
     'GC':   identify_gc,
     'N64':  identify_n64,
     'PSX':  identify_psx,
