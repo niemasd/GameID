@@ -384,7 +384,7 @@ def identify_gb_gbc(fn, db, prefer_gamedb=False):
     global_checksum_actual = sum(v for i,v in enumerate(data) if i not in {0x014E, 0x014F}) % 65536
 
     # identify game
-    gamedb_ID = None # TODO
+    gamedb_ID = (title, global_checksum_expected)
     out = {
         'internal_title': title,
         'cgb_mode': cgb_mode,
@@ -396,10 +396,10 @@ def identify_gb_gbc(fn, db, prefer_gamedb=False):
         'ram_banks': ram_banks,
         'licensee': licensee,
         'rom_version': rom_version,
-        'header_checksum_expected': header_checksum_expected,
-        'header_checksum_actual': header_checksum_actual,
-        'global_checksum_expected': global_checksum_expected,
-        'global_checksum_actual': global_checksum_actual,
+        'header_checksum_expected': '0x%s' % hex(header_checksum_expected)[2:].zfill(2),
+        'header_checksum_actual': '0x%s' % hex(header_checksum_actual)[2:].zfill(2),
+        'global_checksum_expected': '0x%s' % hex(global_checksum_expected)[2:].zfill(4),
+        'global_checksum_actual': '0x%s' % hex(global_checksum_actual)[2:].zfill(4),
     }
     if manufacturer_code is not None:
         out['manufacturer_code'] = manufacturer_code
@@ -571,9 +571,9 @@ def identify_snes(fn, db, prefer_gamedb=False):
         'internal_title': internal_name,
         'fast_slow_rom': fast_slow_rom,
         'rom_type': rom_type,
-        'developer_ID': hex(developer_ID)[2:],
+        'developer_ID': '0x%s' % hex(developer_ID)[2:].zfill(2),
         'rom_version': rom_version,
-        'checksum': checksum,
+        'checksum': '0x%s' % checksum.zfill(4),
     }
     if hardware is not None:
         out['hardware'] = hardware
