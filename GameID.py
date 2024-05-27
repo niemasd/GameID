@@ -254,7 +254,7 @@ def load_db(fn, bufsize=DEFAULT_BUFSIZE):
         f = open_file(fn, 'rb', bufsize=bufsize); data = f.read(); f.close()
     return ploads(data)
 
-# identify PSX game
+# identify PSX/PS2 game
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
     # set things up
     iso = ISO9660(fn, console); out = None; serial = None
