@@ -22,7 +22,12 @@ FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 ISO966O_UUID_TERMINATION = {ord('$'), ord('.')}
 
 # GB/GBC constants
+GB_CARTRIDGE_TYPES = {0: 'ROM', 1: 'MBC1', 2: 'MBC1 + RAM', 3: 'MBC1 + RAM + Battery', 5: 'MBC2', 6: 'MBC2 + Battery', 8: 'ROM + RAM', 9: 'ROM + RAM + Battery', 11: 'MMM01', 12: 'MMM01 + RAM', 13: 'MMM01 + RAM + Battery', 15: 'MBC3 + Timer + Battery', 16: 'MBC3 + Timer + RAM + Battery', 17: 'MBC3', 18: 'MBC3 + RAM', 19: 'MBC3 + RAM + Battery', 25: 'MBC5', 26: 'MBC5 + RAM', 27: 'MBC5 + RAM + Battery', 28: 'MBC5 + Rumble', 29: 'MBC5 + Rumble + RAM', 30: 'MBC5 + Rumble + RAM + Battery', 32: 'MBC6', 34: 'MBC7 + Sensor + Rumble + RAM + Battery', 252: 'Pocket Camera', 253: 'Bandai TAMA5', 254: 'HuC3', 255: 'HuC1 + RAM + Battery'}
+GB_LICENSEE_NEW_CODES = {'00': 'None', '01': 'Nintendo R&D1', '08': 'Capcom', '13': 'Electronic Arts', '18': 'Hudson Soft', '19': 'b-ai', '20': 'kss', '22': 'pow', '24': 'PCM Complete', '25': 'san-x', '28': 'Kemco Japan', '29': 'seta', '30': 'Viacom', '31': 'Nintendo', '32': 'Bandai', '33': 'Ocean/Acclaim', '34': 'Konami', '35': 'Hector', '37': 'Taito', '38': 'Hudson', '39': 'Banpresto', '41': 'Ubi Soft', '42': 'Atlus', '44': 'Malibu', '46': 'angel', '47': 'Bullet-Proof', '49': 'irem', '50': 'Absolute', '51': 'Acclaim', '52': 'Activision', '53': 'American sammy', '54': 'Konami', '55': 'Hi tech entertainment', '56': 'LJN', '57': 'Matchbox', '58': 'Mattel', '59': 'Milton Bradley', '60': 'Titus', '61': 'Virgin', '64': 'LucasArts', '67': 'Ocean', '69': 'Electronic Arts', '70': 'Infogrames', '71': 'Interplay', '72': 'Broderbund', '73': 'sculptured', '75': 'sci', '78': 'THQ', '79': 'Accolade', '80': 'misawa', '83': 'lozc', '86': 'Tokuma Shoten Intermedia', '87': 'Tsukuda Original', '91': 'Chunsoft', '92': 'Video system', '93': 'Ocean/Acclaim', '95': 'Varie', '96': "Yonezawa/s'pal", '97': 'Kaneko', '99': 'Pack in soft', 'A4': 'Konami (Yu-Gi-Oh!)'}
+GB_LICENSEE_OLD_CODES = {0: 'None', 1: 'Nintendo', 8: 'Capcom', 9: 'Hot-B', 10: 'Jaleco', 11: 'Coconuts Japan', 12: 'Elite Systems', 19: 'EA (Electronic Arts)', 24: 'Hudsonsoft', 25: 'ITC Entertainment', 26: 'Yanoman', 29: 'Japan Clary', 31: 'Virgin Interactive', 36: 'PCM Complete', 37: 'San-X', 40: 'Kotobuki Systems', 41: 'Seta', 48: 'Infogrames', 49: 'Nintendo', 50: 'Bandai', 51: None, 52: 'Konami', 53: 'HectorSoft', 56: 'Capcom', 57: 'Banpresto', 60: '.Entertainment i', 62: 'Gremlin', 65: 'Ubisoft', 66: 'Atlus', 68: 'Malibu', 70: 'Angel', 71: 'Spectrum Holoby', 73: 'Irem', 74: 'Virgin Interactive', 77: 'Malibu', 79: 'U.S. Gold', 80: 'Absolute', 81: 'Acclaim', 82: 'Activision', 83: 'American Sammy', 84: 'GameTek', 85: 'Park Place', 86: 'LJN', 87: 'Matchbox', 89: 'Milton Bradley', 90: 'Mindscape', 91: 'Romstar', 92: 'Naxat Soft', 93: 'Tradewest', 96: 'Titus', 97: 'Virgin Interactive', 103: 'Ocean Interactive', 105: 'EA (Electronic Arts)', 110: 'Elite Systems', 111: 'Electro Brain', 112: 'Infogrames', 113: 'Interplay', 114: 'Broderbund', 115: 'Sculptered Soft', 117: 'The Sales Curve', 120: 't.hq', 121: 'Accolade', 122: 'Triffix Entertainment', 124: 'Microprose', 127: 'Kemco', 128: 'Misawa Entertainment', 131: 'Lozc', 134: 'Tokuma Shoten Intermedia', 139: 'Bullet-Proof Software', 140: 'Vic Tokai', 142: 'Ape', 143: "I'Max", 145: 'Chunsoft Co.', 146: 'Video System', 147: 'Tsubaraya Productions Co.', 149: 'Varie Corporation', 150: "Yonezawa/S'Pal", 151: 'Kaneko', 153: 'Arc', 154: 'Nihon Bussan', 155: 'Tecmo', 156: 'Imagineer', 157: 'Banpresto', 159: 'Nova', 161: 'Hori Electric', 162: 'Bandai', 164: 'Konami', 166: 'Kawada', 167: 'Takara', 169: 'Technos Japan', 170: 'Broderbund', 172: 'Toei Animation', 173: 'Toho', 175: 'Namco', 176: 'acclaim', 177: 'ASCII or Nexsoft', 178: 'Bandai', 180: 'Square Enix', 182: 'HAL Laboratory', 183: 'SNK', 185: 'Pony Canyon', 186: 'Culture Brain', 187: 'Sunsoft', 189: 'Sony Imagesoft', 191: 'Sammy', 192: 'Taito', 194: 'Kemco', 195: 'Squaresoft', 196: 'Tokuma Shoten Intermedia', 197: 'Data East', 198: 'Tonkinhouse', 200: 'Koei', 201: 'UFL', 202: 'Ultra', 203: 'Vap', 204: 'Use Corporation', 205: 'Meldac', 206: '.Pony Canyon or', 207: 'Angel', 208: 'Taito', 209: 'Sofel', 210: 'Quest', 211: 'Sigma Enterprises', 212: 'ASK Kodansha Co.', 214: 'Naxat Soft', 215: 'Copya System', 217: 'Banpresto', 218: 'Tomy', 219: 'LJN', 221: 'NCS', 222: 'Human', 223: 'Altron', 224: 'Jaleco', 225: 'Towa Chiki', 226: 'Yutaka', 227: 'Varie', 229: 'Epcoh', 231: 'Athena', 232: 'Asmik ACE Entertainment', 233: 'Natsume', 234: 'King Records', 235: 'Atlus', 236: 'Epic/Sony Records', 238: 'IGS', 240: 'A Wave', 243: 'Extreme Entertainment', 255: 'LJN'}
 GB_NINTENDO_LOGO = bytes([0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E])
+GB_RAM_SIZE_BANKS = {0: (0, 0), 1: (2048, 1), 2: (8192, 1), 3: (32768, 4), 4: (131072, 16), 5: (65536, 8)}
+GB_ROM_SIZE_BANKS = {0: (32768, 2), 1: (65536, 4), 2: (131072, 8), 3: (262144, 16), 4: (524288, 32), 5: (1048576, 64), 6: (2097152, 128), 7: (4194304, 256), 8: (8388608, 512), 82: (1179648, 72), 83: (1310720, 80), 84: (1572864, 96)}
 
 # N64 constants
 N64_FIRST_WORD = b'\x80\x37\x12\x40'
@@ -309,10 +314,12 @@ def identify_ps2(fn, db, prefer_gamedb=False):
 # identify GB/GBC game
 def identify_gb_gbc(fn, db, prefer_gamedb=False):
     # parse GB/GBC ROM header: https://github.com/niemasd/GameDB-GB/wiki#memory-map
-    f = open_file(fn, mode='rb'); header = f.read(0x0150); f.close()
-    if header[0x0104 : 0x0134] != GB_NINTENDO_LOGO:
+    f = open_file(fn, mode='rb'); data = f.read(); f.close()
+    if data[0x0104 : 0x0134] != GB_NINTENDO_LOGO:
         error("Invalid GB/GBC ROM (Nintendo logo mismatch): %s" % fn)
-    title = header[0x0134 : 0x013F]; manufacturer_code = header[0x013F : 0x0143]; cgb_flag = header[0x0143]
+    title = data[0x0134 : 0x013F]; manufacturer_code = data[0x013F : 0x0143]; cgb_flag = data[0x0143]
+
+    # parse CGB flag (whether or not GameBoy Color features are supported)
     if cgb_flag == 0x80:
         cgb_mode = "GBC (supports GB)"
     elif cgb_flag == 0xC0:
@@ -321,25 +328,78 @@ def identify_gb_gbc(fn, db, prefer_gamedb=False):
         cgb_mode = "PGB"
     else: # probably old GB game where this byte is part of title
         cgb_mode = "GB"
+
+    # parse manufacturer code (and potentially expand title if there is none)
     if sum(1 for v in manufacturer_code if ord('A') <= v <= ord('Z')) == 4:
         manufacturer_code = manufacturer_code.decode()
     else:
-        title = header[0x0134 : 0x0144]; manufacturer_code = None
+        title = data[0x0134 : 0x0144]; manufacturer_code = None
     title = bytes([v if ord(' ') <= v <= ord('~') else ord(' ') for v in title]).decode().strip()
-    pass # TODO check SGB flag: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L352-L355
-    pass # TODO check cartridge type: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L357-L362
-    pass # TODO check ROM size/banks: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L364-L369
-    pass # TODO check RAM size/banks: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L371-L376
-    pass # TODO check licensee: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L385-L395
-    pass # TODO check ROM version number: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L397-L399
-    pass # TODO check header checksum: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L401-L412
-    pass # TODO check global checksum: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L414-L420
+
+    # parse Super GameBoy support
+    sgb_support = (data[0x0146] == 0x03)
+
+    # parse cartridge type
+    if data[0x0147] in GB_CARTRIDGE_TYPES:
+        cartridge_type = GB_CARTRIDGE_TYPES[data[0x0147]]
+    else:
+        cartridge_type = "Unknown"
+
+    # parse ROM size (bytes) and number of banks
+    if data[0x0148] in GB_ROM_SIZE_BANKS:
+        rom_size, rom_banks = GB_ROM_SIZE_BANKS[data[0x0148]]
+    else:
+        rom_size = "Unknown"; rom_banks = "Unknown"
+
+    # parse RAM size (bytes) and number of banks
+    if data[0x0149] in GB_RAM_SIZE_BANKS:
+        ram_size, ram_banks = GB_RAM_SIZE_BANKS[data[0x0149]]
+    else:
+        ram_size = "Unknown"; ram_banks = "Unknown"
+
+    # parse licensee code
+    if data[0x014B] == 0x33: # new licensee code
+        try:
+            licensee = GB_LICENSEE_NEW_CODES[data[0x0144 : 0x0146].decode()]
+        except: # new licensee code not found
+            licensee = "Unknown"
+    elif data[0x014B] in GB_LICENSEE_OLD_CODES: # old licensee code
+        licensee = GB_LICENSEE_OLD_CODES[data[0x014B]]
+    else: # old licensee code not found
+        licensee = "Unknown"
+
+    # parse ROM version
+    rom_version = data[0x014C]
+
+    # parse expected checksums
+    header_checksum_expected = data[0x014D]
+    global_checksum_expected = unpack('>H', data[0x014E:0x0150])[0]
+
+    # calculate actual checksums
+    header_checksum_actual = 256
+    for v in data[0x0134 : 0x014D]:
+        header_checksum_actual -= (v+1)
+        while header_checksum_actual < 0:
+            header_checksum_actual += 256
+    global_checksum_actual = sum(v for i,v in enumerate(data) if i not in {0x014E, 0x014F}) % 65536
 
     # identify game
     gamedb_ID = None # TODO
     out = {
         'internal_title': title,
         'cgb_mode': cgb_mode,
+        'sgb_support': sgb_support,
+        'cartridge_type': cartridge_type,
+        'rom_size': rom_size,
+        'rom_banks': rom_banks,
+        'ram_size': ram_size,
+        'ram_banks': ram_banks,
+        'licensee': licensee,
+        'rom_version': rom_version,
+        'header_checksum_expected': header_checksum_expected,
+        'header_checksum_actual': header_checksum_actual,
+        'global_checksum_expected': global_checksum_expected,
+        'global_checksum_actual': global_checksum_actual,
     }
     if manufacturer_code is not None:
         out['manufacturer_code'] = manufacturer_code
