@@ -1,6 +1,9 @@
 # Game files
 *.bin
 *.cue
+*.gb
+*.gba
+*.gbc
 *.gz
 *.iso
 *.n64

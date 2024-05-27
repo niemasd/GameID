@@ -15,7 +15,7 @@ import sys
 import argparse
 
 # useful constants
-VERSION = '1.0.8'
+VERSION = '1.0.9'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -284,8 +284,9 @@ def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
         error("%s game not found (%s): %s\t%s" % (console, volume_ID, fn, root_fns))
     else:
         out['ID'] = serial.replace('_','-')
-        if not prefer_gamedb:
-            out['uuid'] = iso.get_uuid()
+        for k,v in [('uuid',iso.get_uuid()), ('volume_ID',iso.get_volume_ID())]:
+            if (k not in out) or (not prefer_gamedb):
+                out[k] = v
         return out
 
 # identify PSX game
@@ -295,6 +296,19 @@ def identify_psx(fn, db, prefer_gamedb=False):
 # identify PS2 game
 def identify_ps2(fn, db, prefer_gamedb=False):
     return identify_psx_ps2(fn, db, 'PS2', prefer_gamedb=prefer_gamedb)
+
+# identify GB/GBC game
+def identify_gb_gbc(fn, db, console, prefer_gamedb=False):
+    # http://problemkaputt.de/pandocs.htm#thecartridgeheader
+    return {'TODO':'TODO'} # TODO
+
+# identify GB game
+def identify_gb(fn, db, prefer_gamedb=False):
+    return identify_gb_gbc(fn, db, 'GB', prefer_gamedb=prefer_gamedb)
+
+# identify GBC game
+def identify_gbc(fn, db, prefer_gamedb=False):
+    return identify_gb_gbc(fn, db, 'GBC', prefer_gamedb=prefer_gamedb)
 
 # identify GC game
 def identify_gc(fn, db, prefer_gamedb=False):
@@ -472,6 +486,8 @@ def identify_snes(fn, db, prefer_gamedb=False):
 
 # dictionary storing all identify functions
 IDENTIFY = {
+    #'GB':   identify_gb,
+    #'GBC':  identify_gbc,
     'GC':   identify_gc,
     'N64':  identify_n64,
     'PSX':  identify_psx,
