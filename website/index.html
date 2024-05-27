@@ -283,7 +283,7 @@
 			try {
 				pyodide.runPython(gameIDWebPy);
 			} catch (e) {
-				if(fileName.endsWith(".cue") || fileName.endsWith(".cue.gz")) {
+				if(fileName.toLowerCase().endsWith(".cue") || fileName.toLowerCase().endsWith(".cue.gz")) {
 					alert("For BIN/CUE games, select the BIN file. If there are multiple BINs, select the first track.");
 				} else {
 					alert("An error occurred. Ensure the input file is correct and try again.");

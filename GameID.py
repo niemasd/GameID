@@ -325,7 +325,7 @@ def identify_gb_gbc(fn, db, prefer_gamedb=False):
         manufacturer_code = manufacturer_code.decode()
     else:
         title = header[0x0134 : 0x0144]; manufacturer_code = None
-    title = title.decode().strip()
+    title = bytes([v if ord(' ') <= v <= ord('~') else ord(' ') for v in title]).decode().strip()
     pass # TODO check SGB flag: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L352-L355
     pass # TODO check cartridge type: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L357-L362
     pass # TODO check ROM size/banks: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L364-L369
