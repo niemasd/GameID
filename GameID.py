@@ -136,11 +136,11 @@ class ISO9660:
             return uuid
         try:
             tmp_start = uuid[:4] # first 4 characters should be year (but might be 0000 if year is 2000)
-            tmp_end = uuid[-2:] # last 2 characters are always(?) extra 00
+            tmp_end = uuid[-2:] # last 2 characters are usually 00, but not always
             if uuid.startswith('0000'):
                 uuid = '2%s' % uuid[1:] # convert 0000MMDDHHMMSS to 2000MMDDHHMMSS (year 2000 sometimes shows up as 0000)
             uuid = datetime.strptime(uuid[:-2], "%Y%m%d%H%M%S")
-            uuid = uuid.strftime("%Y-%m-%d-%H-%M-%S-") + tmp_end # format as YYYY-MM-DD-HH-MM-SS-00
+            uuid = uuid.strftime("%Y-%m-%d-%H-%M-%S-") + tmp_end # format as YYYY-MM-DD-HH-MM-SS-??
             if tmp_start == '0000':
                 uuid = '0%s' % uuid[1:] # revert back to 0000 instead of 2000 after confirming that it's a valid date/time
         except:
@@ -286,7 +286,7 @@ def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
     if out is None:
         error("%s game not found (%s): %s\t%s" % (console, volume_ID, fn, root_fns))
     else:
-        out['ID'] = serial
+        out['ID'] = serial.replace('_','-')
         if not prefer_gamedb:
             out['uuid'] = iso.get_uuid()
         return out
