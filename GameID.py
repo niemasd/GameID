@@ -326,6 +326,14 @@ def identify_gb_gbc(fn, db, prefer_gamedb=False):
     else:
         title = header[0x0134 : 0x0144]; manufacturer_code = None
     title = title.decode().strip()
+    pass # TODO check SGB flag: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L352-L355
+    pass # TODO check cartridge type: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L357-L362
+    pass # TODO check ROM size/banks: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L364-L369
+    pass # TODO check RAM size/banks: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L371-L376
+    pass # TODO check licensee: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L385-L395
+    pass # TODO check ROM version number: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L397-L399
+    pass # TODO check header checksum: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L401-L412
+    pass # TODO check global checksum: https://github.com/niemasd/ROM-Save-Tools/blob/549abe772e8b8a45a5167370dd7ef61ef1e8d418/nrst/rom/gb.py#L414-L420
 
     # identify game
     gamedb_ID = None # TODO
