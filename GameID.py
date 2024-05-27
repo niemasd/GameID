@@ -123,29 +123,26 @@ class ISO9660:
         except:
             return data_preparer_ID
 
-    # get UUID (volume creation date + time, but could be at different offsets)
+    # get UUID (usually YYYY-MM-DD-HH-MM-SS-?? but not always a valid date)
     def get_uuid(self):
-        uuid_start_ind = 813 # usually offset 813 of PVD, but could be different, so find it
+        # find UUID (usually offset 813 of PVD, but could be different)
+        uuid_start_ind = 813
         for i in range(813, 830):
             if self.pvd[i] in ISO966O_UUID_TERMINATION:
                 uuid_start_ind = i - 16; break
         uuid = self.pvd[uuid_start_ind : uuid_start_ind + 16]
+
+        # try to parse as text (if it fails, just return the raw bytes)
         try:
-            uuid = uuid.decode().strip()
+            uuid = uuid.decode()
         except:
             return uuid
-        try:
-            tmp_start = uuid[:4] # first 4 characters should be year (but might be 0000 if year is 2000)
-            tmp_end = uuid[-2:] # last 2 characters are usually 00, but not always
-            if uuid.startswith('0000'):
-                uuid = '2%s' % uuid[1:] # convert 0000MMDDHHMMSS to 2000MMDDHHMMSS (year 2000 sometimes shows up as 0000)
-            uuid = datetime.strptime(uuid[:-2], "%Y%m%d%H%M%S")
-            uuid = uuid.strftime("%Y-%m-%d-%H-%M-%S-") + tmp_end # format as YYYY-MM-DD-HH-MM-SS-??
-            if tmp_start == '0000':
-                uuid = '0%s' % uuid[1:] # revert back to 0000 instead of 2000 after confirming that it's a valid date/time
-        except:
-            return uuid
-        return uuid
+
+        # add dashes to UUID text and return: YYYYMMDDHHMMSS?? --> YYYY-MM-DD-HH-MM-SS-??
+        out = uuid[:4]
+        for i in range(4, len(uuid), 2):
+            out = out + '-' + uuid[i:i+2]
+        return out
 
     # parse filenames: https://wiki.osdev.org/ISO_9660#Recursing_from_the_Root_Directory
     def get_filenames(self, only_root_dir=True):
