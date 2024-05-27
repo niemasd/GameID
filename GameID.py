@@ -14,14 +14,23 @@ from sys import stderr
 import sys
 import argparse
 
-# useful constants
+# GameID constants
 VERSION = '1.0.9'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 ISO966O_UUID_TERMINATION = {ord('$'), ord('.')}
-PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
+
+# GB/GBC constants
+GB_NINTENDO_LOGO = bytes([0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E])
+
+# N64 constants
 N64_FIRST_WORD = b'\x80\x37\x12\x40'
+
+# PSX constants
+PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
+
+# SNES constants
 SNES_LOROM_HEADER_START = 0x7FC0
 SNES_HIROM_HEADER_START = 0xFFC0
 
@@ -298,17 +307,42 @@ def identify_ps2(fn, db, prefer_gamedb=False):
     return identify_psx_ps2(fn, db, 'PS2', prefer_gamedb=prefer_gamedb)
 
 # identify GB/GBC game
-def identify_gb_gbc(fn, db, console, prefer_gamedb=False):
-    # http://problemkaputt.de/pandocs.htm#thecartridgeheader
-    return {'TODO':'TODO'} # TODO
+def identify_gb_gbc(fn, db, prefer_gamedb=False):
+    # parse GB/GBC ROM header: https://github.com/niemasd/GameDB-GB/wiki#memory-map
+    f = open_file(fn, mode='rb'); header = f.read(0x0150); f.close()
+    if header[0x0104 : 0x0134] != GB_NINTENDO_LOGO:
+        error("Invalid GB/GBC ROM (Nintendo logo mismatch): %s" % fn)
+    title = header[0x0134 : 0x013F]; manufacturer_code = header[0x013F : 0x0143]; cgb_flag = header[0x0143]
+    if cgb_flag == 0x80:
+        cgb_mode = "GBC (supports GB)"
+    elif cgb_flag == 0xC0:
+        cgb_mode = "GBC only"
+    elif (cgb_flag & 0b00001100) != 0:
+        cgb_mode = "PGB"
+    else: # probably old GB game where this byte is part of title
+        cgb_mode = "GB"
+    if sum(1 for v in manufacturer_code if ord('A') <= v <= ord('Z')) == 4:
+        manufacturer_code = manufacturer_code.decode()
+    else:
+        title = header[0x0134 : 0x0144]; manufacturer_code = None
+    title = title.decode().strip()
 
-# identify GB game
-def identify_gb(fn, db, prefer_gamedb=False):
-    return identify_gb_gbc(fn, db, 'GB', prefer_gamedb=prefer_gamedb)
-
-# identify GBC game
-def identify_gbc(fn, db, prefer_gamedb=False):
-    return identify_gb_gbc(fn, db, 'GBC', prefer_gamedb=prefer_gamedb)
+    # identify game
+    gamedb_ID = None # TODO
+    out = {
+        'internal_title': title,
+        'cgb_mode': cgb_mode,
+    }
+    if manufacturer_code is not None:
+        out['manufacturer_code'] = manufacturer_code
+    if gamedb_ID in db['GB_GBC']:
+        gamedb_entry = db['GB_GBC'][gamedb_ID]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    else:
+        out['title'] = out['internal_title'] # 'title' and 'internal_title' will be the same if game not found in GameDB
+    return out
 
 # identify GC game
 def identify_gc(fn, db, prefer_gamedb=False):
@@ -486,11 +520,12 @@ def identify_snes(fn, db, prefer_gamedb=False):
 
 # dictionary storing all identify functions
 IDENTIFY = {
-    'GC':   identify_gc,
-    'N64':  identify_n64,
-    'PSX':  identify_psx,
-    'PS2':  identify_ps2,
-    'SNES': identify_snes,
+    'GB/GBC': identify_gb_gbc,
+    'GC':     identify_gc,
+    'N64':    identify_n64,
+    'PSX':    identify_psx,
+    'PS2':    identify_ps2,
+    'SNES':   identify_snes,
 }
 
 # throw an error for unsupported consoles

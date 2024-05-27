@@ -11,7 +11,7 @@ from sys import argv
 from urllib.request import urlopen
 
 # constants
-CONSOLES = {'GC', 'N64', 'PSX', 'PS2', 'SNES'}
+CONSOLES = {'GB', 'GBC', 'GC', 'N64', 'PSX', 'PS2', 'SNES'}
 
 # get GameDB URL
 def get_url(console):
@@ -47,9 +47,16 @@ if __name__ == "__main__":
     # load GameDB databases
     db = {'GAMEID': dict()}
     for console in sorted(CONSOLES):
+        if console == 'GBC':
+            continue # TODO DELETE THIS IF-STATEMENT ONCE GameDB-GBC IS CREATED
         print("Loading GameDB-%s..." % console)
         db[console] = load_gamedb(console) # load GameDB
         db['GAMEID'][console] = dict() # just in case I need to preprocess stuff for this console
+
+    # merge GB/GBC
+    print("Merging GB and GBC databases...")
+    db['GB_GBC'] = db['GB'] # TODO FIX ONCE GameDB-GBC EXISTS
+    del db['GB']#; del db['GBC']
 
     # fix GC (only keep middle part of DOL-XXXX-XXX serial)
     print("Fixing GC database...")
