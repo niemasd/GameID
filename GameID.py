@@ -11,11 +11,12 @@ from os.path import abspath, expanduser, getsize, isfile
 from pickle import loads as ploads
 from struct import unpack
 from sys import stderr
+from zipfile import ZipFile
 import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.9'
+VERSION = '1.0.10'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -59,11 +60,16 @@ def check_not_exists(fn):
 
 # open an output text file for writing (automatically handle gzip)
 def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
+    ext = fn.split('.')[-1].strip().lower()
+
+    # standard output/input
     if fn == 'stdout':
         from sys import stdout as f
     elif fn == 'stdin':
         from sys import stdin as f
-    elif fn.strip().lower().endswith('.gz'):
+
+    # GZIP files
+    elif ext == 'gz':
         if mode not in FILE_MODES_GZ:
             error("Invalid gzip file mode: %s" % mode)
         elif 'r' in mode:
@@ -72,6 +78,17 @@ def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
             f = gopen(fn, mode, compresslevel=9)
         else:
             error("Invalid gzip file mode: %s" % mode)
+
+    # ZIP files
+    elif ext == 'zip':
+        if 'r' not in mode or 'w' in mode:
+            error("Only read mode is supported for gzip files")
+        z = ZipFile(fn, 'r'); names = z.namelist()
+        if len(names) != 1:
+            error("More than 1 file in zip: %s" % fn)
+        return z.open(names[0])
+
+    # Regular files
     else:
         f = open(fn, mode, buffering=bufsize)
     return f
@@ -80,6 +97,8 @@ def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
 class ISO9660:
     # initialize ISO handling
     def __init__(self, fn, console, bufsize=DEFAULT_BUFSIZE):
+        if fn.split('.')[-1].strip().lower() in {'7z', 'zip'}:
+            error("%s files are not yet supported for %s games" % (fn.split('.')[-1].strip().lower(), console))
         self.fn = abspath(expanduser(fn)); self.size = getsize(fn); self.console = console
         if fn.lower().endswith('.cue'):
             f_cue = open_file(fn, 'rt', bufsize=bufsize)
