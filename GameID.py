@@ -479,7 +479,7 @@ def identify_gba(fn, db, prefer_gamedb=False):
         'software_version': software_version,
     }
     if game_code in db['GBA']:
-        gamedb_entry = db['GBA'][gamedb_ID]
+        gamedb_entry = db['GBA'][game_code]
         for k,v in gamedb_entry.items():
             if (k not in out) or prefer_gamedb:
                 out[k] = v
@@ -600,11 +600,7 @@ def identify_snes(fn, db, prefer_gamedb=False):
 
     # parse SNES ROM header: https://snes.nesdev.org/wiki/ROM_header#Cartridge_header
     header = data[header_start:]
-    internal_name = header[0 : 21]
-    try:
-        internal_name = internal_name.decode().strip()
-    except:
-        pass
+    internal_name = header[0 : 21]; internal_name_hex_string = '0x%s' % ''.join(hex(v)[2:].zfill(2) for v in internal_name)
     developer_ID = header[26]
     rom_version = header[27]
 
@@ -641,9 +637,9 @@ def identify_snes(fn, db, prefer_gamedb=False):
             hardware = hardware.replace(" + Coprocessor", " + Coprocessor (%s)" % coprocessor)
 
     # identify game
-    gamedb_ID = (developer_ID, internal_name, rom_version, int(checksum,16))
+    gamedb_ID = (developer_ID, internal_name_hex_string, rom_version, int(checksum,16))
     out = {
-        'internal_title': internal_name,
+        'internal_title': internal_name_hex_string,
         'fast_slow_rom': fast_slow_rom,
         'rom_type': rom_type,
         'developer_ID': '0x%s' % hex(developer_ID)[2:].zfill(2),
@@ -658,7 +654,7 @@ def identify_snes(fn, db, prefer_gamedb=False):
             if (k not in out) or prefer_gamedb:
                 out[k] = v
     else:
-        out['title'] = internal_name # 'title' and 'internal_title' will be the same if game not found in GameDB
+        out['title'] = ''.join(chr(v) if ord(' ') <= v <= ord('~') else ' ' for v in internal_name).strip()
     return out
 
 # dictionary storing all identify functions
