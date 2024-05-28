@@ -292,13 +292,17 @@ def identify_psp(fn, db, prefer_gamedb=False):
         from pycdlib import PyCdlib
     except:
         error("Unable to import pycdlib. Install with: pip install pycdlib")
-    iso = PyCdlib(); iso.open_fp(open_file(fn,'rb'))
-    data = BytesIO(); iso.get_file_from_iso_fp(data, iso_path='/UMD_DATA.BIN'); serial = ""
+    iso = PyCdlib(); iso.open_fp(open_file(fn,'rb')); data = BytesIO(); iso.get_file_from_iso_fp(data, iso_path='/UMD_DATA.BIN')
+
+    # read serial
+    serial = ""
     for v in data.getvalue():
         if v == ord('|'):
             break
         serial += chr(v)
     serial = serial.strip()
+
+    # identify game
     if serial in db['PSP']:
         return db['PSP'][serial]
 
