@@ -4,6 +4,7 @@ Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported con
 * `GB/GBC` - Nintendo Game Boy (Color)
 * `GC` - Nintendo GameCube
 * `N64` - Nintendo 64
+* `PSP` - Sony PlayStation Portable
 * `PSX` - Sony PlayStation
 * `PS2` - Sony PlayStation 2
 * `SNES` - Super Nintendo Entertainment System
