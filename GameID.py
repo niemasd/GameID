@@ -7,6 +7,7 @@ GameID: Identify a game using GameDB
 from datetime import datetime
 from gzip import decompress as gdecompress
 from gzip import open as gopen
+from io import BytesIO
 from os.path import abspath, expanduser, getsize, isfile
 from pickle import loads as ploads
 from struct import unpack
@@ -16,7 +17,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.10'
+VERSION = '1.0.11'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -283,6 +284,23 @@ def load_db(fn, bufsize=DEFAULT_BUFSIZE):
     else:
         f = open_file(fn, 'rb', bufsize=bufsize); data = f.read(); f.close()
     return ploads(data)
+
+# identify PSP game
+def identify_psp(fn, db, prefer_gamedb=False):
+    # open PSP ISO
+    try:
+        from pycdlib import PyCdlib
+    except:
+        error("Unable to import pycdlib. Install with: pip install pycdlib")
+    iso = PyCdlib(); iso.open_fp(open_file(fn,'rb'))
+    data = BytesIO(); iso.get_file_from_iso_fp(data, iso_path='/UMD_DATA.BIN'); serial = ""
+    for v in data.getvalue():
+        if v == ord('|'):
+            break
+        serial += chr(v)
+    serial = serial.strip()
+    if serial in db['PSP']:
+        return db['PSP'][serial]
 
 # identify PSX/PS2 game
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
@@ -610,6 +628,7 @@ IDENTIFY = {
     'GB/GBC': identify_gb_gbc,
     'GC':     identify_gc,
     'N64':    identify_n64,
+    'PSP':    identify_psp,
     'PSX':    identify_psx,
     'PS2':    identify_ps2,
     'SNES':   identify_snes,

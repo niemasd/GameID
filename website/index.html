@@ -165,6 +165,7 @@
 			await pyodide.loadPackage('micropip');
 			const micropip = pyodide.pyimport('micropip');
 			await micropip.install('assets/gciso-0.1-py3-none-any.whl');
+            await micropip.install('assets/pycdlib-1.14.0-py2.py3-none-any.whl');
 
 			// write database to Pyodide FS
 			pyodide.FS.writeFile(PYODIDE_ROOT + 'db.pkl.gz', new Uint8Array(await (await fetch('assets/db.pkl.gz')).arrayBuffer()));
