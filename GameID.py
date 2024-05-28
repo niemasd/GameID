@@ -316,7 +316,7 @@ def identify_gb_gbc(fn, db, prefer_gamedb=False):
     # parse GB/GBC ROM header: https://github.com/niemasd/GameDB-GB/wiki#memory-map
     f = open_file(fn, mode='rb'); data = f.read(); f.close()
     if data[0x0104 : 0x0134] != GB_NINTENDO_LOGO:
-        error("Invalid GB/GBC ROM (Nintendo logo mismatch): %s" % fn)
+        pass # error("Invalid GB/GBC ROM (Nintendo logo mismatch): %s" % fn)
     title = data[0x0134 : 0x013F]; manufacturer_code = data[0x013F : 0x0143]; cgb_flag = data[0x0143]
 
     # parse CGB flag (whether or not GameBoy Color features are supported)
