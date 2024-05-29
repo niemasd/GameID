@@ -17,11 +17,13 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.12'
+VERSION = '1.0.13'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 ISO966O_UUID_TERMINATION = {ord('$'), ord('.')}
+MONTH_3LET_TO_FULL = {'JAN': 'January', 'FEB': 'February', 'MAR': 'March', 'APR': 'April', 'MAY': 'May', 'JUN': 'June', 'JUL': 'July', 'AUG': 'August', 'SEP': 'September', 'OCT': 'October', 'NOV': 'November', 'DEC': 'December'}
+SAFE = set('-.!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
 
 # GB/GBC constants
 GB_CARTRIDGE_TYPES = {0: 'ROM', 1: 'MBC1', 2: 'MBC1 + RAM', 3: 'MBC1 + RAM + Battery', 5: 'MBC2', 6: 'MBC2 + Battery', 8: 'ROM + RAM', 9: 'ROM + RAM + Battery', 11: 'MMM01', 12: 'MMM01 + RAM', 13: 'MMM01 + RAM + Battery', 15: 'MBC3 + Timer + Battery', 16: 'MBC3 + Timer + RAM + Battery', 17: 'MBC3', 18: 'MBC3 + RAM', 19: 'MBC3 + RAM + Battery', 25: 'MBC5', 26: 'MBC5 + RAM', 27: 'MBC5 + RAM + Battery', 28: 'MBC5 + Rumble', 29: 'MBC5 + Rumble + RAM', 30: 'MBC5 + Rumble + RAM + Battery', 32: 'MBC6', 34: 'MBC7 + Sensor + Rumble + RAM + Battery', 252: 'Pocket Camera', 253: 'Bandai TAMA5', 254: 'HuC3', 255: 'HuC1 + RAM + Battery'}
@@ -33,6 +35,12 @@ GB_ROM_SIZE_BANKS = {0: (32768, 2), 1: (65536, 4), 2: (131072, 8), 3: (262144, 1
 
 # GBA constants
 GBA_NINTENDO_LOGO = bytes([0x24, 0xFF, 0xAE, 0x51, 0x69, 0x9A, 0xA2, 0x21, 0x3D, 0x84, 0x82, 0x0A, 0x84, 0xE4, 0x09, 0xAD, 0x11, 0x24, 0x8B, 0x98, 0xC0, 0x81, 0x7F, 0x21, 0xA3, 0x52, 0xBE, 0x19, 0x93, 0x09, 0xCE, 0x20, 0x10, 0x46, 0x4A, 0x4A, 0xF8, 0x27, 0x31, 0xEC, 0x58, 0xC7, 0xE8, 0x33, 0x82, 0xE3, 0xCE, 0xBF, 0x85, 0xF4, 0xDF, 0x94, 0xCE, 0x4B, 0x09, 0xC1, 0x94, 0x56, 0x8A, 0xC0, 0x13, 0x72, 0xA7, 0xFC, 0x9F, 0x84, 0x4D, 0x73, 0xA3, 0xCA, 0x9A, 0x61, 0x58, 0x97, 0xA3, 0x27, 0xFC, 0x03, 0x98, 0x76, 0x23, 0x1D, 0xC7, 0x61, 0x03, 0x04, 0xAE, 0x56, 0xBF, 0x38, 0x84, 0x00, 0x40, 0xA7, 0x0E, 0xFD, 0xFF, 0x52, 0xFE, 0x03, 0x6F, 0x95, 0x30, 0xF1, 0x97, 0xFB, 0xC0, 0x85, 0x60, 0xD6, 0x80, 0x25, 0xA9, 0x63, 0xBE, 0x03, 0x01, 0x4E, 0x38, 0xE2, 0xF9, 0xA2, 0x34, 0xFF, 0xBB, 0x3E, 0x03, 0x44, 0x78, 0x00, 0x90, 0xCB, 0x88, 0x11, 0x3A, 0x94, 0x65, 0xC0, 0x7C, 0x63, 0x87, 0xF0, 0x3C, 0xAF, 0xD6, 0x25, 0xE4, 0x8B, 0x38, 0x0A, 0xAC, 0x72, 0x21, 0xD4, 0xF8, 0x07])
+
+# Genesis constants
+GENESIS_DEVICE_SUPPORT = {'J': '3-button Controller', '6': '6-button Controller', '0': 'Master System Controller', 'A': 'Analog Joystick', '4': 'Multitap', 'G': 'Lightgun', 'L': 'Activator', 'M': 'Mouse', 'B': 'Trackball', 'T': 'Tablet', 'V': 'Paddle', 'K': 'Keyboard or Keypad', 'R': 'RS-232', 'P': 'Printer', 'C': 'CD-ROM (Sega CD)', 'F': 'Floppy Drive', 'D': 'Download'}
+GENESIS_REGION_SUPPORT = {'J': 'Japan', 'U': 'Americas', 'E': 'Europe'}
+GENESIS_SOFTWARE_TYPES = {'GM': 'Game', 'AI': 'Aid', 'OS': 'Boot ROM (TMSS)', 'BR': 'Boot ROM (Sega CD)'}
+GENESIS_SYSTEM_TYPES = {"SEGA MEGA DRIVE", "SEGA GENESIS", "SEGA 32X", "SEGA EVERDRIVE", "SEGA SSF", "SEGA MEGAWIFI", "SEGA PICO", "SEGA TERA68K", "SEGA TERA286"}
 
 # N64 constants
 N64_FIRST_WORD = b'\x80\x37\x12\x40'
@@ -657,16 +665,178 @@ def identify_snes(fn, db, prefer_gamedb=False):
         out['title'] = ''.join(chr(v) if ord(' ') <= v <= ord('~') else ' ' for v in internal_name).strip()
     return out
 
+# identify Genesis game
+def identify_genesis(fn, db, prefer_gamedb=False):
+    # parse Genesis ROM header: https://plutiedev.com/rom-header
+    f = open_file(fn, mode='rb'); data = f.read(); f.close()
+
+    # system type
+    try:
+        system_type = data[0x100 : 0x110].decode().strip()
+    except:
+        system_type = None
+    if system_type not in GENESIS_SYSTEM_TYPES:
+        error("Invalid Genesis ROM: %s" % fn)
+
+    # publisher
+    publisher = data[0x113 : 0x117]
+    try:
+        publisher = publisher.decode().strip()
+    except:
+        pass
+
+    # release year
+    release_year = data[0x118 : 0x11C]
+    try:
+        release_year = int(release_year.decode())
+    except:
+        pass
+
+    # release month
+    release_month = data[0x11D : 0x120]
+    try:
+        release_month = release_month.decode().strip()
+    except:
+        pass
+    if release_month in MONTH_3LET_TO_FULL:
+        release_month = MONTH_3LET_TO_FULL[release_month]
+
+    # domestic title
+    title_domestic = data[0x120 : 0x150]
+    try:
+        title_domestic = title_domestic.decode().strip()
+    except:
+        pass
+
+    # overseas title
+    title_overseas = data[0x150 : 0x180]
+    try:
+        title_overseas = title_overseas.decode().strip()
+    except:
+        pass
+
+    # software type
+    software_type = data[0x180 : 0x182]
+    try:
+        software_type = software_type.decode().strip()
+    except:
+        pass
+    if software_type in GENESIS_SOFTWARE_TYPES:
+        software_type = GENESIS_SOFTWARE_TYPES[software_type]
+
+    # serial
+    serial = data[0x182 : 0x18B]
+    try:
+        serial = serial.decode().strip()
+    except:
+        pass
+
+    # revision
+    revision = data[0x18C : 0x18E]
+    try:
+        revision = revision.decode().strip()
+    except:
+        pass
+
+    # checksum
+    checksum = unpack('>H', data[0x18E : 0x190])[0]
+
+    # device support
+    device_support = data[0x190 : 0x1A0]
+    try:
+        tmp = list()
+        for v in device_support:
+            if v < ord('!') or v > ord('~'):
+                continue
+            c = chr(v)
+            if c in GENESIS_DEVICE_SUPPORT:
+                tmp.append(GENESIS_DEVICE_SUPPORT[c])
+            else:
+                tmp.append(c)
+        device_support = ' / '.join(s for s in sorted(tmp))
+    except:
+        pass
+    if len(device_support) == 0:
+        device_support = None
+
+    # ROM/RAM start/end
+    rom_start = unpack('>I', data[0x1A0 : 0x1A4])[0]
+    rom_end = unpack('>I', data[0x1A4 : 0x1A8])[0]
+    ram_start = unpack('>I', data[0x1A8 : 0x1AC])[0]
+    ram_end = unpack('>I', data[0x1AC : 0x1B0])[0]
+
+    # extra memory
+    extra_memory = data[0x1B0 : 0x1BC]
+
+    # modem support
+    modem_support = data[0x1BC : 0x1C8]
+    try:
+        modem_support = modem_support.decode().strip()
+    except:
+        pass
+    if len(modem_support) == 0:
+        modem_support = None
+
+    # region support
+    region_support = data[0x1F0 : 0x1F3]
+    try:
+        tmp = list()
+        for v in region_support:
+            if v < ord('!') or v > ord('~'):
+                continue
+            c = chr(v)
+            if c in GENESIS_REGION_SUPPORT:
+                tmp.append(GENESIS_REGION_SUPPORT[c])
+            else:
+                tmp.append(c)
+        region_support = ' / '.join(s for s in sorted(tmp))
+    except:
+        pass
+    if len(region_support) == 0:
+        region_support = None
+
+    # identify game
+    out = {
+        'system_type': system_type,
+        'publisher': publisher,
+        'release_year': release_year,
+        'release_month': release_month,
+        'title_domestic': title_domestic,
+        'title_overseas': title_overseas,
+        'software_type': software_type,
+        'serial': serial,
+        'revision': revision,
+        'checksum': '0x%s' % hex(checksum)[2:].zfill(4),
+        'device_support': device_support,
+        'rom_start': '0x%s' % hex(rom_start)[2:].zfill(8),
+        'rom_end': '0x%s' % hex(rom_end)[2:].zfill(8),
+        'ram_start': '0x%s' % hex(ram_start)[2:].zfill(8),
+        'ram_end': '0x%s' % hex(ram_end)[2:].zfill(8),
+        'extra_memory': '0x%s' % ''.join(hex(v)[2:].zfill(2) for v in extra_memory),
+        'modem_support': modem_support,
+        'region_support': region_support,
+    }
+    out['title'] = out['title_overseas']
+    if isinstance(serial, str):
+        gamedb_ID = ''.join(c if c in SAFE else '_' for c in serial).replace('-','')
+        if gamedb_ID in db['Genesis']:
+            gamedb_entry = db['Genesis'][gamedb_ID]
+            for k,v in gamedb_entry.items():
+                if (k not in out) or prefer_gamedb:
+                    out[k] = v
+    return out
+
 # dictionary storing all identify functions
 IDENTIFY = {
-    'GB/GBC': identify_gb_gbc,
-    'GBA':    identify_gba,
-    'GC':     identify_gc,
-    'N64':    identify_n64,
-    'PSP':    identify_psp,
-    'PSX':    identify_psx,
-    'PS2':    identify_ps2,
-    'SNES':   identify_snes,
+    'GB/GBC':  identify_gb_gbc,
+    'GBA':     identify_gba,
+    'GC':      identify_gc,
+    'Genesis': identify_genesis,
+    'N64':     identify_n64,
+    'PSP':     identify_psp,
+    'PSX':     identify_psx,
+    'PS2':     identify_ps2,
+    'SNES':    identify_snes,
 }
 
 # throw an error for unsupported consoles
