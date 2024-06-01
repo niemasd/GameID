@@ -368,13 +368,14 @@ def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
 
     # finalize output and return
     if out is None:
-        error("%s game not found (%s): %s\t%s" % (console, volume_ID, fn, root_fns))
+        out = dict()
     else:
         out['ID'] = serial.replace('_','-')
-        for k,v in [('uuid',iso.get_uuid()), ('volume_ID',iso.get_volume_ID())]:
-            if (k not in out) or (not prefer_gamedb):
-                out[k] = v
-        return out
+    for k,v in [('uuid',iso.get_uuid()), ('volume_ID',iso.get_volume_ID())]:
+        if (k not in out) or (not prefer_gamedb):
+            out[k] = v
+    out['root_files'] = ' / '.join(sorted(root_fns))
+    return out
 
 # identify PSX game
 def identify_psx(fn, db, prefer_gamedb=False):
