@@ -70,6 +70,11 @@ if __name__ == "__main__":
         # replace '-' with '_' (most serials in ISO header are SXXX_XXXXX instead of SXXX-XXXXX)
         db[console] = {k.replace('-','_'):v for k,v in db[console].items()}
 
+        # add Redump names as alternate keys (just in case serial isn't in root filenames or volume ID)
+        for k in list(db[console].keys()):
+            if 'redump_name' in db[console][k]:
+                db[console][db[console][k]['redump_name']] = db[console][k]
+
         # preprocess PSX/PS2 serial beginnings for speed in GameID (sorted in decreasing order of frequency)
         counts = dict()
         for ID in db[console]:

@@ -366,6 +366,15 @@ def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
             if serial in db[console]:
                 out = db[console][serial]
 
+    # failed to find serial based on file or volume ID, so try to identify with filename
+    if out is None:
+        fn_no_ext = fn.split('/')[-1].strip()
+        if fn_no_ext.endswith('.gz'):
+            fn_no_ext = fn_no_ext[:-3].strip()
+        fn_no_ext = '.'.join(fn_no_ext.split('.')[:-1]).strip()
+        if fn_no_ext in db[console]:
+            out = db[console][fn_no_ext]
+
     # finalize output and return
     if out is None:
         out = dict()
