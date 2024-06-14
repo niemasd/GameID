@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.17'
+VERSION = '1.0.18'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -403,8 +403,9 @@ def identify_psx_ps2(fn, db, console, user_uuid=None, user_volume_ID=None, prefe
 
     # try to find file in root directory with name SXXX_XXX.XX
     root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len in iso.get_filenames(only_root_dir=True)]
+    root_fns_upper = [s.strip().upper() for s in root_fns]
     for prefix in db['GAMEID'][console]['ID_PREFIXES']:
-        for root_fn in root_fns:
+        for root_fn in root_fns_upper:
             if root_fn.startswith(prefix):
                 serial = root_fn.replace('.','').replace('-','_')
                 if serial not in db[console] and len(serial) > len(prefix): # might have a different delimiter than '-' or '_' (e.g. DQ7 is 'SLUSP012.06)
