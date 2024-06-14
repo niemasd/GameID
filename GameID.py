@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.15'
+VERSION = '1.0.16'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -301,7 +301,7 @@ def get_args_interactive(argv):
 
     # get game filename (--input)
     while arg_input is None:
-        print_log("Enter game title (no quotes): ", end='')
+        print_log("Enter game filename (no quotes): ", end='')
         arg_input = input().strip()
         if not isfile(arg_input):
             print_log("ERROR: File not found: %s\n" % arg_input); arg_input = None
