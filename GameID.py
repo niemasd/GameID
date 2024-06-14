@@ -63,7 +63,7 @@ def error(message, exitcode=1):
 
 # check if a file exists and throw an error if it doesn't
 def check_exists(fn):
-    if not isfile(fn) and not isdir(fn):
+    if not isfile(fn) and not isdir(fn) and not fn.lower().startswith('/dev/'):
         error("File/folder not found: %s" % fn)
 
 # check if a file doesn't exist and throw an error if it does
@@ -303,8 +303,8 @@ def get_args_interactive(argv):
     while arg_input is None:
         print_log("Enter game filename (no quotes): ", end='')
         arg_input = input().strip()
-        if not isfile(arg_input):
-            print_log("ERROR: File not found: %s\n" % arg_input); arg_input = None
+        if not isfile(arg_input) and not arg_input.lower().startswith('/dev/'):
+            print_log("ERROR: File/folder not found: %s\n" % arg_input); arg_input = None
     argv += ['--input', arg_input]
 
     # get console (--console)
