@@ -5,10 +5,11 @@ GameID: Identify a game using GameDB
 
 # standard imports
 from datetime import datetime
+from glob import glob
 from gzip import decompress as gdecompress
 from gzip import open as gopen
 from io import BytesIO
-from os.path import abspath, expanduser, getsize, isfile
+from os.path import abspath, expanduser, getsize, isdir, isfile
 from pickle import loads as ploads
 from struct import unpack
 from sys import stderr
@@ -17,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.14'
+VERSION = '1.0.15'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -62,13 +63,13 @@ def error(message, exitcode=1):
 
 # check if a file exists and throw an error if it doesn't
 def check_exists(fn):
-    if not isfile(fn):
-        error("File not found: %s" % fn)
+    if not isfile(fn) and not isdir(fn):
+        error("File/folder not found: %s" % fn)
 
 # check if a file doesn't exist and throw an error if it does
 def check_not_exists(fn):
-    if isfile(fn):
-        error("File exists: %s" % fn)
+    if isfile(fn) or isdir(fn):
+        error("File/folder exists: %s" % fn)
 
 # open an output text file for writing (automatically handle gzip)
 def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
@@ -104,6 +105,47 @@ def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
     else:
         f = open(fn, mode, buffering=bufsize)
     return f
+
+# helper class to handle mounted discs / extracted images
+class MOUNTED_DISC:
+    # initialize
+    def __init__(self, fn, console, bufsize=DEFAULT_BUFSIZE):
+        fn = abspath(expanduser(fn)).rstrip('/')
+        if not isdir(fn):
+            error("Input must be a directory: %s" % fn)
+        self.fn = fn; self.console = console
+
+    # get system ID
+    def get_system_ID(self):
+        return None
+
+    # get volume ID
+    def get_volume_ID(self):
+        return None
+
+    # get publisher ID
+    def get_publisher_ID(self):
+        return None
+
+    # get data preparer ID
+    def get_data_preparer_ID(self):
+        return None
+
+    # get UUID (usually YYYY-MM-DD-HH-MM-SS-?? but not always a valid date)
+    def get_uuid(self):
+        return None
+
+    # parse filenames as (name, LBA, size) tuples
+    def get_filenames(self, only_root_dir=True):
+        fns = list(); to_visit = [(self.fn, None, None)]
+        while len(to_visit) != 0:
+            curr, curr_lba, curr_size = to_visit.pop()
+            if isfile(curr):
+                fns.append((curr.strip()[len(self.fn)+1:].strip(), curr_lba, curr_size))
+            elif isdir(curr) and (curr == self.fn or (not only_root_dir)):
+                to_visit += [(fn.strip(), None, None) for fn in glob('%s/*' % curr)]
+        fns.sort()
+        return fns
 
 # helper class to handle ISO 9660 disc images
 class ISO9660:
@@ -189,7 +231,7 @@ class ISO9660:
             out = out + '-' + uuid[i:i+2]
         return out
 
-    # parse filenames: https://wiki.osdev.org/ISO_9660#Recursing_from_the_Root_Directory
+    # parse filenames as (name, LBA, size) tuples: https://wiki.osdev.org/ISO_9660#Recursing_from_the_Root_Directory
     def get_filenames(self, only_root_dir=True):
         root_dir_lba = unpack('<I', self.pvd[156 +  2 : 156 +  6])[0]
         root_dir_len = unpack('<I', self.pvd[156 + 10 : 156 + 14])[0]
@@ -341,7 +383,13 @@ def identify_psp(fn, db, prefer_gamedb=False):
 # identify PSX/PS2 game
 def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
     # set things up
-    iso = ISO9660(fn, console); out = None; serial = None
+    if isfile(fn):
+        iso = ISO9660(fn, console)
+    elif isdir(fn):
+        iso = MOUNTED_DISC(fn, console)
+    else:
+        error("File/folder not found: %s" % fn)
+    out = None; serial = None
 
     # try to find file in root directory with name SXXX_XXX.XX
     root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len in iso.get_filenames(only_root_dir=True)]
@@ -381,7 +429,7 @@ def identify_psx_ps2(fn, db, console, prefer_gamedb=False):
     else:
         out['ID'] = serial.replace('_','-')
     for k,v in [('uuid',iso.get_uuid()), ('volume_ID',iso.get_volume_ID())]:
-        if (k not in out) or (not prefer_gamedb):
+        if v is not None and ((k not in out) or (not prefer_gamedb)):
             out[k] = v
     out['root_files'] = ' / '.join(sorted(root_fns))
     return out
