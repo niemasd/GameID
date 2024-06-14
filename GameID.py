@@ -327,7 +327,7 @@ def parse_args():
     parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(sorted(IDENTIFY.keys())))
     parser.add_argument('-d', '--database', required=False, type=str, default=None, help="GameID Database (db.pkl.gz)")
     parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
-    parser.add_argument('--uuid', required=False, type=str, default=None, help="Disc UUID (if already known)")
+    parser.add_argument('--disc_uuid', required=False, type=str, default=None, help="Disc UUID (if already known)")
     parser.add_argument('--delimiter', required=False, type=str, default='\t', help="Delimiter")
     parser.add_argument('--prefer_gamedb', action="store_true", help="Prefer Metadata in GameDB (rather than metadata loaded from game)")
     parser.add_argument('--version', action="store_true", help="Print GameID Version (%s)" % VERSION)
@@ -350,8 +350,8 @@ def parse_args():
         check_not_exists(args.output)
 
     # check UUID
-    if args.uuid is not None:
-        args.uuid = args.uuid.strip()
+    if args.disc_uuid is not None:
+        args.disc_uuid = args.disc_uuid.strip()
 
     # all good, so return args
     return args
@@ -932,7 +932,7 @@ def check_console(console):
 def main():
     args = parse_args()
     db = load_db(args.database)
-    meta = IDENTIFY[args.console](args.input, db, user_uuid=args.uuid, prefer_gamedb=args.prefer_gamedb)
+    meta = IDENTIFY[args.console](args.input, db, user_uuid=args.disc_uuid, prefer_gamedb=args.prefer_gamedb)
     if meta is None:
         error("%s game not found: %s" % (args.console, args.input))
     f_out = open_file(args.output, 'wt')
