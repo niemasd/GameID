@@ -393,7 +393,7 @@ def identify_psp(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=Fals
 # identify PSX/PS2 game
 def identify_psx_ps2(fn, db, console, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # set things up
-    if isfile(fn):
+    if isfile(fn) or fn.lower().startswith('/dev/'):
         iso = ISO9660(fn, console)
     elif isdir(fn):
         iso = MOUNTED_DISC(fn, console, uuid=user_uuid, volume_ID=user_volume_ID)
