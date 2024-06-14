@@ -18,8 +18,9 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.18'
+VERSION = '1.0.19'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
+DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 ISO966O_UUID_TERMINATION = {ord('$'), ord('.')}
@@ -367,11 +368,13 @@ def parse_args():
     return args
 
 # load GameID database
-def load_db(fn, bufsize=DEFAULT_BUFSIZE):
+def load_db(fn, internet_timeout=DEFAULT_INTERNET_TIMEOUT, bufsize=DEFAULT_BUFSIZE):
     if fn is None:
-        from urllib.request import urlopen; data = gdecompress(urlopen(DB_URL).read())
-    else:
-        f = open_file(fn, 'rb', bufsize=bufsize); data = f.read(); f.close()
+        try:
+            from urllib.request import urlopen; return ploads(gdecompress(urlopen(DB_URL, timeout=internet_timeout).read()))
+        except:
+            fn = '%s/db.pkl.gz' % '/'.join(abspath(__file__).split('/')[:-1])
+    f = open_file(fn, 'rb', bufsize=bufsize); data = f.read(); f.close()
     return ploads(data)
 
 # identify PSP game
