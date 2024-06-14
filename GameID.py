@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.16'
+VERSION = '1.0.17'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
@@ -109,11 +109,11 @@ def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
 # helper class to handle mounted discs / extracted images
 class MOUNTED_DISC:
     # initialize
-    def __init__(self, fn, console, uuid=None, bufsize=DEFAULT_BUFSIZE):
+    def __init__(self, fn, console, uuid=None, volume_ID=None, bufsize=DEFAULT_BUFSIZE):
         fn = abspath(expanduser(fn)).rstrip('/')
         if not isdir(fn):
             error("Input must be a directory: %s" % fn)
-        self.fn = fn; self.console = console; self.uuid = uuid
+        self.fn = fn; self.console = console; self.uuid = uuid; self.volume_ID = volume_ID
 
     # get system ID
     def get_system_ID(self):
@@ -121,7 +121,7 @@ class MOUNTED_DISC:
 
     # get volume ID
     def get_volume_ID(self):
-        return None
+        return self.volume_ID
 
     # get publisher ID
     def get_publisher_ID(self):
@@ -328,6 +328,7 @@ def parse_args():
     parser.add_argument('-d', '--database', required=False, type=str, default=None, help="GameID Database (db.pkl.gz)")
     parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
     parser.add_argument('--disc_uuid', required=False, type=str, default=None, help="Disc UUID (if already known)")
+    parser.add_argument('--disc_label', required=False, type=str, default=None, help="Disc Label / Volume ID (if already known)")
     parser.add_argument('--delimiter', required=False, type=str, default='\t', help="Delimiter")
     parser.add_argument('--prefer_gamedb', action="store_true", help="Prefer Metadata in GameDB (rather than metadata loaded from game)")
     parser.add_argument('--version', action="store_true", help="Print GameID Version (%s)" % VERSION)
@@ -349,9 +350,13 @@ def parse_args():
     if args.output != 'stdout':
         check_not_exists(args.output)
 
-    # check UUID
+    # check disc UUID
     if args.disc_uuid is not None:
         args.disc_uuid = args.disc_uuid.strip()
+
+    # check disc label
+    if args.disc_label is not None:
+        args.disc_label = args.disc_label.strip()
 
     # all good, so return args
     return args
@@ -365,7 +370,7 @@ def load_db(fn, bufsize=DEFAULT_BUFSIZE):
     return ploads(data)
 
 # identify PSP game
-def identify_psp(fn, db, user_uuid=None, prefer_gamedb=False):
+def identify_psp(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # open PSP ISO
     try:
         from pycdlib import PyCdlib
@@ -386,12 +391,12 @@ def identify_psp(fn, db, user_uuid=None, prefer_gamedb=False):
         return db['PSP'][serial]
 
 # identify PSX/PS2 game
-def identify_psx_ps2(fn, db, console, user_uuid=None, prefer_gamedb=False):
+def identify_psx_ps2(fn, db, console, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # set things up
     if isfile(fn):
         iso = ISO9660(fn, console)
     elif isdir(fn):
-        iso = MOUNTED_DISC(fn, console, uuid=user_uuid)
+        iso = MOUNTED_DISC(fn, console, uuid=user_uuid, volume_ID=user_volume_ID)
     else:
         error("File/folder not found: %s" % fn)
     out = None; serial = None
@@ -440,15 +445,15 @@ def identify_psx_ps2(fn, db, console, user_uuid=None, prefer_gamedb=False):
     return out
 
 # identify PSX game
-def identify_psx(fn, db, user_uuid=None, prefer_gamedb=False):
-    return identify_psx_ps2(fn, db, 'PSX', user_uuid=user_uuid, prefer_gamedb=prefer_gamedb)
+def identify_psx(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
+    return identify_psx_ps2(fn, db, 'PSX', user_uuid=user_uuid, user_volume_ID=user_volume_ID, prefer_gamedb=prefer_gamedb)
 
 # identify PS2 game
-def identify_ps2(fn, db, user_uuid=None, prefer_gamedb=False):
-    return identify_psx_ps2(fn, db, 'PS2', user_uuid=user_uuid, prefer_gamedb=prefer_gamedb)
+def identify_ps2(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
+    return identify_psx_ps2(fn, db, 'PS2', user_uuid=user_uuid, user_volume_ID=user_volume_ID, prefer_gamedb=prefer_gamedb)
 
 # identify GB/GBC game
-def identify_gb_gbc(fn, db, user_uuid=None, prefer_gamedb=False):
+def identify_gb_gbc(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # parse GB/GBC ROM header: https://github.com/niemasd/GameDB-GB/wiki#memory-map
     f = open_file(fn, mode='rb'); data = f.read(); f.close()
     if data[0x0104 : 0x0134] != GB_NINTENDO_LOGO:
@@ -549,7 +554,7 @@ def identify_gb_gbc(fn, db, user_uuid=None, prefer_gamedb=False):
     return out
 
 # identify GBA game
-def identify_gba(fn, db, user_uuid=None, prefer_gamedb=False):
+def identify_gba(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # parse GBA ROM header: http://problemkaputt.de/gbatek-gba-cartridge-header.htm
     f = open_file(fn, mode='rb'); data = f.read(192); f.close()
     if data[0x04 : 0xA0] != GBA_NINTENDO_LOGO:
@@ -580,7 +585,7 @@ def identify_gba(fn, db, user_uuid=None, prefer_gamedb=False):
     return out
 
 # identify GC game
-def identify_gc(fn, db, user_uuid=None, prefer_gamedb=False):
+def identify_gc(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # open GC ISO
     try:
         from gciso import IsoFile as GCIsoFile
@@ -629,7 +634,7 @@ def n64_convert_endianness(data):
     return out
 
 # identify N64 game
-def identify_n64(fn, db, user_uuid=None, prefer_gamedb=False):
+def identify_n64(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     f = open_file(fn, mode='rb'); header = f.read(0x40) # stop before "Boot code/strap"
 
     # determine endianness from first word: https://en64.shoutwiki.com/wiki/ROM
@@ -662,7 +667,7 @@ def identify_n64(fn, db, user_uuid=None, prefer_gamedb=False):
     f.close(); error("N64 game not found (%s %s): %s" % (cartridge_ID, country_code, fn))
 
 # identify SNES game
-def identify_snes(fn, db, user_uuid=None, prefer_gamedb=False):
+def identify_snes(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # load ROM and remove optional 512-byte header: https://snes.nesdev.org/wiki/ROM_file_formats#Detecting_Headered_ROM
     f = open_file(fn, mode='rb'); data = f.read(); f.close()
     if (len(data) % 1024) == 512:
@@ -750,7 +755,7 @@ def identify_snes(fn, db, user_uuid=None, prefer_gamedb=False):
     return out
 
 # identify Genesis game
-def identify_genesis(fn, db, user_uuid=None, prefer_gamedb=False):
+def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # parse Genesis ROM header: https://plutiedev.com/rom-header
     f = open_file(fn, mode='rb'); data = f.read(); f.close()
 
@@ -932,7 +937,7 @@ def check_console(console):
 def main():
     args = parse_args()
     db = load_db(args.database)
-    meta = IDENTIFY[args.console](args.input, db, user_uuid=args.disc_uuid, prefer_gamedb=args.prefer_gamedb)
+    meta = IDENTIFY[args.console](args.input, db, user_uuid=args.disc_uuid, user_volume_ID=args.disc_label, prefer_gamedb=args.prefer_gamedb)
     if meta is None:
         error("%s game not found: %s" % (args.console, args.input))
     f_out = open_file(args.output, 'wt')
