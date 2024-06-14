@@ -9,7 +9,7 @@ from glob import glob
 from gzip import decompress as gdecompress
 from gzip import open as gopen
 from io import BytesIO
-from os.path import abspath, expanduser, getsize, isdir, isfile
+from os.path import abspath, expanduser, isdir, isfile
 from pickle import loads as ploads
 from struct import unpack
 from sys import stderr
@@ -52,6 +52,11 @@ PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
 # SNES constants
 SNES_LOROM_HEADER_START = 0x7FC0
 SNES_HIROM_HEADER_START = 0xFFC0
+
+# replacement for os.path.getsize() that should hopefully support /dev/... volumes
+def getsize(fn):
+    with open(fn, 'rb') as f:
+        return f.seek(0, 2)
 
 # print a log message
 def print_log(message='', end='\n', file=stderr):
