@@ -6,11 +6,13 @@ ConsoleID: Identify the console of a game
 # standard imports
 from gzip import open as gopen
 from os.path import abspath, expanduser, isdir, isfile
+from sys import stderr
 import argparse
 
 # ConsoleID constants
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
+STRIP_EXT = ['gz'] # list instead of set to iterate in order (just in case)
 CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetypes
     '3DS':       {'3ds', 'cia'},                              # Nintendo 3DS
     'Amiga':     {'adf', 'adz', 'dms', 'ipf'},                # Amiga
@@ -42,6 +44,10 @@ CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetype
     'XBOX360':   {'iso'},                                     # Microsoft XBOX 360
 }
 EXT2CONSOLE = {ext:console for console in CONSOLE_EXTS for ext in CONSOLE_EXTS[console] if len([c for c,es in CONSOLE_EXTS.items() if ext in es]) == 1}
+
+# print an error message and exit
+def error(message, exitcode=1):
+    print(message, file=stderr); exit(exitcode)
 
 # check if a file exists and throw an error if it doesn't
 def check_exists(fn):
@@ -93,10 +99,31 @@ def parse_args():
     # all good, so return args
     return args
 
-# # main program logic
+# get the (lower-case) extension of a filename
+def get_extension(fn):
+    fn = fn.strip().lower()
+    for ext in STRIP_EXT:
+        if fn.endswith('.%s' % ext):
+            fn = fn[:1-len(ext)]
+    return fn.split('.')[-1].strip()
+
+# main logic to identify a console
+def identify(fn):
+    # first try to identify console by file extension
+    ext = get_extension(fn)
+    if ext in EXT2CONSOLE:
+        return EXT2CONSOLE[ext]
+
+    # failed to identify console
+    return None
+
+# main program logic
 def main():
     args = parse_args()
-    f_out = open_file(args.output, 'wt')
+    console = identify(args.input)
+    if console is None:
+        error("Unable to identify console: %s" % args.input)
+    f_out = open_file(args.output, 'wt'); print(console, file=f_out); f_out.close()
 
 # run program
 if __name__ == "__main__":
