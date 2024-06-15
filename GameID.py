@@ -115,11 +115,11 @@ def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
 # helper class to handle mounted discs / extracted images
 class MOUNTED_DISC:
     # initialize
-    def __init__(self, fn, console, uuid=None, volume_ID=None, bufsize=DEFAULT_BUFSIZE):
+    def __init__(self, fn, uuid=None, volume_ID=None, bufsize=DEFAULT_BUFSIZE):
         fn = abspath(expanduser(fn)).rstrip('/')
         if not isdir(fn):
             error("Input must be a directory: %s" % fn)
-        self.fn = fn; self.console = console; self.uuid = uuid; self.volume_ID = volume_ID
+        self.fn = fn; self.uuid = uuid; self.volume_ID = volume_ID
 
     # get system ID
     def get_system_ID(self):
@@ -156,10 +156,10 @@ class MOUNTED_DISC:
 # helper class to handle ISO 9660 disc images
 class ISO9660:
     # initialize ISO handling
-    def __init__(self, fn, console, bufsize=DEFAULT_BUFSIZE):
+    def __init__(self, fn, bufsize=DEFAULT_BUFSIZE):
         if fn.split('.')[-1].strip().lower() in {'7z', 'zip'}:
-            error("%s files are not yet supported for %s games" % (fn.split('.')[-1].strip().lower(), console))
-        self.fn = abspath(expanduser(fn)); self.size = getsize(fn); self.console = console
+            error("%s files are not yet supported" % (fn.split('.')[-1].strip().lower()))
+        self.fn = abspath(expanduser(fn)); self.size = getsize(fn)
         if fn.lower().endswith('.cue'):
             f_cue = open_file(fn, 'rt', bufsize=bufsize)
             self.bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in f_cue if l.strip().lower().startswith('file')]
@@ -175,11 +175,11 @@ class ISO9660:
         else:
             error("Invalid disc image block size: %s" % fn)
 
-        # PSX raw image starts at 0x18: https://github.com/cebix/ff7tools/blob/21dd8e29c1f1599d7c776738b1df20f2e9c06de0/ff7/cd.py#L30-L40
-        if self.console == 'PSX' and self.block_size == 2352:
+        # block size 2352 starts at 0x18: https://github.com/cebix/ff7tools/blob/21dd8e29c1f1599d7c776738b1df20f2e9c06de0/ff7/cd.py#L30-L40
+        if self.block_size == 2352:
             self.block_offset = 0x18
         else:
-            self.block_offset = 0 # most console disc images start at the beginning
+            self.block_offset = 0 # most disc images start at the beginning
 
         # read PVD: https://wiki.osdev.org/ISO_9660#The_Primary_Volume_Descriptor
         self.f.seek(self.block_offset + (16 * self.block_size)); self.pvd = self.f.read(2048)
@@ -402,9 +402,9 @@ def identify_psp(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=Fals
 def identify_psx_ps2(fn, db, console, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # set things up
     if isfile(fn) or fn.lower().startswith('/dev/'):
-        iso = ISO9660(fn, console)
+        iso = ISO9660(fn)
     elif isdir(fn):
-        iso = MOUNTED_DISC(fn, console, uuid=user_uuid, volume_ID=user_volume_ID)
+        iso = MOUNTED_DISC(fn, uuid=user_uuid, volume_ID=user_volume_ID)
     else:
         error("File/folder not found: %s" % fn)
     out = None; serial = None
