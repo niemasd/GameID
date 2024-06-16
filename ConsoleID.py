@@ -9,10 +9,15 @@ from os.path import abspath, expanduser, isdir, isfile
 from sys import stderr
 import argparse
 
+# non-standard imports
+from GameID import check_exists, error, ISO9660, ISO9660FP, open_file
+from pycdlib import PyCdlib
+
 # ConsoleID constants
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 STRIP_EXT = ['gz'] # list instead of set to iterate in order (just in case)
+MAX_SIZE_CD = 734003200 # 700 MiB
 CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetypes
     '3DS':       {'3ds', 'cia'},                              # Nintendo 3DS
     'Amiga':     {'adf', 'adz', 'dms', 'ipf'},                # Amiga
@@ -44,41 +49,7 @@ CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetype
     'XBOX360':   {'iso'},                                     # Microsoft XBOX 360
 }
 EXT2CONSOLE = {ext:console for console in CONSOLE_EXTS for ext in CONSOLE_EXTS[console] if len([c for c,es in CONSOLE_EXTS.items() if ext in es]) == 1}
-
-# print an error message and exit
-def error(message, exitcode=1):
-    print(message, file=stderr); exit(exitcode)
-
-# check if a file exists and throw an error if it doesn't
-def check_exists(fn):
-    if not isfile(fn) and not isdir(fn) and not fn.lower().startswith('/dev/'):
-        error("File/folder not found: %s" % fn)
-
-# open an output text file for writing (automatically handle gzip)
-def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
-    ext = fn.split('.')[-1].strip().lower()
-
-    # standard output/input
-    if fn == 'stdout':
-        from sys import stdout as f
-    elif fn == 'stdin':
-        from sys import stdin as f
-
-    # GZIP files
-    elif ext == 'gz':
-        if mode not in FILE_MODES_GZ:
-            error("Invalid gzip file mode: %s" % mode)
-        elif 'r' in mode:
-            f = gopen(fn, mode)
-        elif 'w' in mode:
-            f = gopen(fn, mode, compresslevel=9)
-        else:
-            error("Invalid gzip file mode: %s" % mode)
-
-    # Regular files
-    else:
-        f = open(fn, mode, buffering=bufsize)
-    return f
+ISO9660_EXTS = {'bin', 'cue', 'iso'}
 
 # parse user arguments
 def parse_args():
@@ -104,18 +75,53 @@ def get_extension(fn):
     fn = fn.strip().lower()
     for ext in STRIP_EXT:
         if fn.endswith('.%s' % ext):
-            fn = fn[:1-len(ext)]
+            fn = fn[:-len(ext)-1]
     return fn.split('.')[-1].strip()
 
+# replacement for os.path.getsize() that should hopefully support /dev/... volumes
+def getsize(fn):
+    with open(fn, 'rb') as f:
+        return f.seek(0, 2)
+
+# identify a disc
+def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
+    # check root files
+    try:
+        iso = PyCdlib(); iso.open_fp(ISO9660FP(fn,'rb'))
+        root_files = {f.file_identifier().decode().strip().upper():f for f in iso.list_children(iso_path='/')}
+        if 'UMD_DATA.BIN' in root_files:
+            return 'PSP'
+        elif 'SYSTEM.CNF' in root_files or 'SYSTEM.CNF;1' in root_files:
+            if getsize(fn) > MAX_SIZE_CD:
+                return 'PS2'
+            else:
+                return 'PSX/PS2' # TODO need to figure out how to distinguish PSX vs PS2 image
+    except:
+        pass
+
+    # check block size
+    try:
+        if ISO9660(fn).block_size == 2352: # assume all ISO 9660 images with a block size of 2352 are PSX games
+            return 'PSX'
+    except:
+        pass
+
 # main logic to identify a console
-def identify(fn):
+def identify(fn, bufsize=DEFAULT_BUFSIZE):
+    # set things up
+    console = None
+
     # first try to identify console by file extension
     ext = get_extension(fn)
-    if ext in EXT2CONSOLE:
-        return EXT2CONSOLE[ext]
+    if console is None and ext in EXT2CONSOLE:
+        console = EXT2CONSOLE[ext]
+
+    # next try to identify ISO 9660 game (e.g. PSX, PS2, etc.)
+    if console is None and ext in ISO9660_EXTS:
+        console = identify_disc(fn, bufsize=bufsize)
 
     # failed to identify console
-    return None
+    return console
 
 # main program logic
 def main():
