@@ -140,7 +140,7 @@ def get_extension(fn):
 def bins_from_cue(fn):
     if get_extension(fn) != 'cue':
         error("Not a CUE file: %s" % fn)
-    f_cue = open_file(fn, 'rt', bufsize=bufsize)
+    f_cue = open_file(fn, 'rt')
     bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in f_cue if l.strip().lower().startswith('file')]
     f_cue.close()
     return bins
