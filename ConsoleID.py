@@ -4,19 +4,17 @@ ConsoleID: Identify the console of a game
 '''
 
 # standard imports
+from glob import glob
 from gzip import open as gopen
 from os.path import abspath, expanduser, isdir, isfile
 from sys import stderr
 import argparse
 
 # non-standard imports
-from GameID import check_exists, error, ISO9660, ISO9660FP, open_file
+from GameID import bins_from_cue, check_exists, DEFAULT_BUFSIZE, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
 from pycdlib import PyCdlib
 
 # ConsoleID constants
-DEFAULT_BUFSIZE = 1000000
-FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
-STRIP_EXT = ['gz'] # list instead of set to iterate in order (just in case)
 MAX_SIZE_CD = 734003200 # 700 MiB
 CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetypes
     '3DS':       {'3ds', 'cia'},                              # Nintendo 3DS
@@ -70,32 +68,34 @@ def parse_args():
     # all good, so return args
     return args
 
-# get the (lower-case) extension of a filename
-def get_extension(fn):
-    fn = fn.strip().lower()
-    for ext in STRIP_EXT:
-        if fn.endswith('.%s' % ext):
-            fn = fn[:-len(ext)-1]
-    return fn.split('.')[-1].strip()
-
-# replacement for os.path.getsize() that should hopefully support /dev/... volumes
-def getsize(fn):
-    with open(fn, 'rb') as f:
-        return f.seek(0, 2)
-
 # identify a disc
 def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
     # check root files
     try:
-        iso = PyCdlib(); iso.open_fp(ISO9660FP(fn,'rb'))
-        root_files = {f.file_identifier().decode().strip().upper():f for f in iso.list_children(iso_path='/')}
+        # if directory, get root files directly
+        if isdir(fn):
+            root_files = {s.split('/')[-1].strip() for s in glob('%s/*' % fn)}
+
+        # if image, get root files from ISO 9660
+        else:
+            iso = PyCdlib(); iso.open_fp(ISO9660FP(fn,'rb'))
+            root_files = {f.file_identifier().decode().strip().upper():f for f in iso.list_children(iso_path='/')}
+
+        # check PSP
         if 'UMD_DATA.BIN' in root_files:
             return 'PSP'
+
+        # check PSX/PS2
         elif 'SYSTEM.CNF' in root_files or 'SYSTEM.CNF;1' in root_files:
-            if getsize(fn) > MAX_SIZE_CD:
+            # first check image size
+            if get_extension(fn) == 'cue':
+                size = sum(getsize(b) for b in bins_from_cue(fn))
+            else:
+                size = getsize(fn)
+            if size > MAX_SIZE_CD: # if image is larger than CD, must be PS2
                 return 'PS2'
             else:
-                return 'PSX/PS2' # TODO need to figure out how to distinguish PSX vs PS2 image
+                return 'PSX/PS2' # TODO need to figure out how to distinguish PSX vs small PS2 images
     except:
         pass
 
@@ -117,7 +117,7 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
         console = EXT2CONSOLE[ext]
 
     # next try to identify ISO 9660 game (e.g. PSX, PS2, etc.)
-    if console is None and ext in ISO9660_EXTS:
+    if console is None and (ext in ISO9660_EXTS or isdir(fn)):
         console = identify_disc(fn, bufsize=bufsize)
 
     # failed to identify console

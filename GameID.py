@@ -23,6 +23,7 @@ DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
+STRIP_EXT = ['gz'] # list instead of set to iterate in order (just in case)
 ISO966O_UUID_TERMINATION = {ord('$'), ord('.')}
 MONTH_3LET_TO_FULL = {'JAN': 'January', 'FEB': 'February', 'MAR': 'March', 'APR': 'April', 'MAY': 'May', 'JUN': 'June', 'JUL': 'July', 'AUG': 'August', 'SEP': 'September', 'OCT': 'October', 'NOV': 'November', 'DEC': 'December'}
 SAFE = set('-.!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
@@ -54,10 +55,25 @@ PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
 SNES_LOROM_HEADER_START = 0x7FC0
 SNES_HIROM_HEADER_START = 0xFFC0
 
+# recursively iterate using glob
+def recursive_glob(fn):
+    to_visit = [fn]
+    while len(to_visit) != 0:
+        curr = to_visit.pop().rstrip('/'); yield curr
+        if isdir(curr):
+            to_visit += list(glob('%s/*' % curr))
+
 # replacement for os.path.getsize() that should hopefully support /dev/... volumes
 def getsize(fn):
-    with open(fn, 'rb') as f:
-        return f.seek(0, 2)
+    if isdir(fn):
+        total = 0
+        for curr in recursive_glob(fn):
+            if isfile(curr):
+                total += getsize(curr)
+        return total
+    else:
+        with open(fn, 'rb') as f:
+            return f.seek(0, 2)
 
 # print a log message
 def print_log(message='', end='\n', file=stderr):
@@ -112,6 +128,23 @@ def open_file(fn, mode='rt', bufsize=DEFAULT_BUFSIZE):
         f = open(fn, mode, buffering=bufsize)
     return f
 
+# get the (lower-case) extension of a filename
+def get_extension(fn):
+    fn = fn.strip().lower()
+    for ext in STRIP_EXT:
+        if fn.endswith('.%s' % ext):
+            fn = fn[:-len(ext)-1]
+    return fn.split('.')[-1].strip()
+
+# get bins from CUE
+def bins_from_cue(fn):
+    if get_extension(fn) != 'cue':
+        error("Not a CUE file: %s" % fn)
+    f_cue = open_file(fn, 'rt', bufsize=bufsize)
+    bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in f_cue if l.strip().lower().startswith('file')]
+    f_cue.close()
+    return bins
+
 # helper class to handle mounted discs / extracted images
 class MOUNTED_DISC:
     # initialize
@@ -161,9 +194,7 @@ class ISO9660:
             error("%s files are not yet supported" % (fn.split('.')[-1].strip().lower()))
         self.fn = abspath(expanduser(fn)); self.size = getsize(fn)
         if fn.lower().endswith('.cue'):
-            f_cue = open_file(fn, 'rt', bufsize=bufsize)
-            self.bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in f_cue if l.strip().lower().startswith('file')]
-            f_cue.close()
+            self.bins = bins_from_cue(fn)
             self.size = sum(getsize(b) for b in self.bins)
             self.f = open_file(self.bins[0], 'rb', bufsize=bufsize)
         else:
