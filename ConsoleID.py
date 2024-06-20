@@ -9,6 +9,7 @@ from gzip import open as gopen
 from os.path import abspath, expanduser, isdir, isfile
 from sys import stderr
 import argparse
+import sys
 
 # non-standard imports
 from GameID import bins_from_cue, check_exists, DEFAULT_BUFSIZE, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
