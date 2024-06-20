@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.19'
+VERSION = '1.0.20'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -632,33 +632,16 @@ def identify_gba(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=Fals
 
 # identify GC game
 def identify_gc(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
-    # open GC ISO
-    try:
-        from gciso import IsoFile as GCIsoFile
-    except:
-        error("Unable to import gciso. Install with: pip install git+https://github.com/pfirsich/gciso.git")
-    iso = GCIsoFile(fn)
-
-    # build initial output: https://gciso.readthedocs.io/en/latest/#gciso.IsoFile
-    serial = iso.gameCode.decode()
+    # parse GC ISO header: https://hitmen.c02.at/files/yagcd/yagcd/chap13.html#sec13
+    f = open_file(fn, mode='rb'); header = f.read(0x0440); f.close()
     out = {
-        'internal_title': iso.gameName.decode(),
-        'ID': serial,
-        'maker_code': iso.makerCode.decode(),
-        'disk_ID': iso.diskId,
-        'version': iso.version,
-        'dol_offset': iso.dolOffset,
-        'dol_size': iso.dolSize,
-        'fst_offset': iso.fstOffset,
-        'fst_size': iso.fstSize,
-        'max_fst_size': iso.maxFstSize,
-        'num_fst_entries': iso.numFstEntries,
-        'string_table_offset': iso.stringTableOffset,
-        'apploader_date': iso.apploaderDate.decode().replace('/','-'),
-        'apploader_entry_point': iso.apploaderEntryPoint,
-        'apploader_code_size': iso.apploaderCodeSize,
-        'apploader_trailer_size': iso.apploaderTrailerSize,
+        'ID':             header[0x0000 : 0x0004].decode(),
+        'maker_code':     header[0x0004 : 0x0006].decode(),
+        'disk_ID':        header[0x0006],
+        'version':        header[0x0007],
+        'internal_title': header[0x0020 : 0x0400].decode(),
     }
+    serial = out['ID']
 
     # identify game
     if serial in db['GC']:
