@@ -67,6 +67,7 @@
 							</label>
 							<select id="input-format" class="form-select mb-3">
 								<option value="" selected disabled>Select Console</option>
+								<option value="auto-detect">Auto-Detect*</option>
 							</select>
 						</div>
 					</div>
@@ -74,8 +75,14 @@
 						<button id="run" class="btn btn-primary">Run</button>
 						<button id="load-example" class="btn btn-secondary ms-3">Load Example File</button>
 					</div>
-					<p class="mt-2 small">Note: <a href="https://github.com/niemasd/GameID/raw/main/example/GameCube-240pSuite-1.17.iso" target="_blank">Example file</a> is a GameCube ISO of <a href="https://artemiourbina.itch.io/240p-test-suite" target="_blank">240p Test Suite v1.17</a>.</p>
-					<p class="mt-2 small">Note: For BIN/CUE games, select the BIN file. If there are multiple BINs, select the first track.</p>
+					<p class="mt-2 small">Note: <a
+							href="https://github.com/niemasd/GameID/raw/main/example/GameCube-240pSuite-1.17.iso"
+							target="_blank">Example file</a> is a GameCube ISO of <a
+							href="https://artemiourbina.itch.io/240p-test-suite" target="_blank">240p Test Suite
+							v1.17</a>.</p>
+					<p class="mt-2 small">Note: For BIN/CUE games, select the BIN file. If there are multiple BINs,
+						select the first track.</p>
+					<p class="mt-2 small">*Console auto-detection may not properly detect the console.</p>
 				</div>
 			</div>
 		</div>
@@ -113,17 +120,20 @@
 	<script type="module">
 		const PYODIDE_ROOT = "/home/pyodide/";
 		const INPUT_FOLDER = "input/";
-		const OUTPUT_FILE = "output.tsv";
+		const CONSOLEID_OUTPUT_FILE = "consoleid-output.tsv";
+		const GAMEID_OUTPUT_FILE = "gameid-output.tsv";
 		const EXAMPLE_FILE_NAME = "GameCube-240pSuite-1.17.iso";
 		let exampleFile = null; // load example file later if needed
 		let usingExampleFile = false;
 
 		getREADME(); // async function that can be run in parallel with other code
+		const consoleIDPy = await(await fetch('assets/ConsoleID.py')).text();
+		const consoleIDWebPy = await(await fetch('assets/ConsoleIDWeb.py')).text();
 		const gameIDPy = await(await fetch('assets/GameID.py')).text();
 		const gameIDWebPy = await(await fetch('assets/GameIDWeb.py')).text();
 		getVariables(gameIDPy);
 
-		const pyodide = await loadPyodideAndGameID();
+		const pyodide = await loadPyodideAndPythonFiles();
 
 		// after site is loaded
 		document.getElementById('input-placeholder').classList.add('d-none');
@@ -158,7 +168,7 @@
 			document.getElementById('readme').innerHTML = marked.parse(README.join('\n')).replaceAll('<a ', '<a target="_blank" ');
 		}
 
-		async function loadPyodideAndGameID() {
+		async function loadPyodideAndPythonFiles() {
 			const pyodide = await loadPyodide();
 
 			// install dependencies
@@ -170,8 +180,11 @@
 			// write database to Pyodide FS
 			pyodide.FS.writeFile(PYODIDE_ROOT + 'db.pkl.gz', new Uint8Array(await (await fetch('assets/db.pkl.gz')).arrayBuffer()));
 
-			// write the python code to Pyodide FS
+			// write the GameID python to Pyodide FS
 			pyodide.FS.writeFile(PYODIDE_ROOT + 'GameID.py', gameIDPy);
+
+			// write the ConsoleID python to Pyodide FS
+			pyodide.FS.writeFile(PYODIDE_ROOT + 'ConsoleID.py', consoleIDPy);
 
 			// create input folder
 			pyodide.FS.mkdir(PYODIDE_ROOT + INPUT_FOLDER);
@@ -182,7 +195,7 @@
 		function addEventListeners() {
 			document.getElementById('run').addEventListener('click', async () => {
 				const file = document.getElementById('input-file').files[0];
-				const format = document.getElementById('input-format').value;
+				let format = document.getElementById('input-format').value;
 				let error = false;
 
 				// error handling
@@ -210,6 +223,13 @@
 				document.getElementById('output-table-body').innerHTML = '';
 
 				if (usingExampleFile) {
+					setupRun(exampleFile, EXAMPLE_FILE_NAME);
+
+					if (format === 'auto-detect') {
+						// we know the example file is a GameCube ISO
+						format = 'GC';
+					}
+
 					runGameID(exampleFile, EXAMPLE_FILE_NAME, format);
 					return;
 				}
@@ -217,15 +237,36 @@
 				const fileReader = new FileReader();
 				fileReader.onload = async () => {
 					const fileData = new Uint8Array(fileReader.result);
+					// replace spaces in fileName with underscore (otherwise GameID.py and ConsoleID.py will not work)
+					const fileName = file.name.replaceAll(' ', '_');
 
-					runGameID(fileData, file.name, format);
+					setupRun(fileData, fileName);
+
+					if (format === 'auto-detect') {
+						const formats = getConsoleFormat(fileData, fileName);
+
+						if (formats === undefined) {
+							postRun();
+							return;
+						}
+
+						for (const f of formats) {
+							//  break on a successful run
+							if (runGameID(fileData, fileName, f)) {
+								break;
+							}
+						}
+
+					} else {
+						runGameID(fileData, fileName, format);
+					}
 				};
 
 				fileReader.readAsArrayBuffer(file);
 			});
 
 			// remove the error class when the user selects a file
-			document.getElementById('input-file').addEventListener('change', () => {
+			document.getElementById('input-file').addEventListener('click', () => {
 				document.getElementById('input-file').classList.remove('is-invalid');
 				if (usingExampleFile) {
 					document.getElementById('load-example').classList.remove('btn-success');
@@ -256,10 +297,11 @@
 			});
 		}
 
-		function runGameID(fileData, fileName, format) {
-			// replace spaces in fileName with underscore (otherwise GameID.py's -i argument fails)
-			fileName = fileName.replaceAll(' ','_')
-
+		/**
+		 * Sets up the run by deleting all files in the input folder and output file.
+		 * Also writes the input file to the Pyodide FS.s
+		 */
+		function setupRun(fileData, fileName) {
 			// delete everything in the input folder
 			for (const file of pyodide.FS.readdir(PYODIDE_ROOT + INPUT_FOLDER)) {
 				if (file !== '.' && file !== '..') {
@@ -268,34 +310,80 @@
 			}
 
 			// remove output file data
-			if (pyodide.FS.analyzePath(PYODIDE_ROOT + OUTPUT_FILE).exists) {
-				pyodide.FS.unlink(PYODIDE_ROOT + OUTPUT_FILE);
+			if (pyodide.FS.analyzePath(PYODIDE_ROOT + CONSOLEID_OUTPUT_FILE).exists) {
+				pyodide.FS.unlink(PYODIDE_ROOT + CONSOLEID_OUTPUT_FILE);
+			}
+			if (pyodide.FS.analyzePath(PYODIDE_ROOT + GAMEID_OUTPUT_FILE).exists) {
+				pyodide.FS.unlink(PYODIDE_ROOT + GAMEID_OUTPUT_FILE);
 			}
 
-			// write test file to Pyodide FS
+			// write input file to Pyodide FS
 			pyodide.FS.writeFile(PYODIDE_ROOT + INPUT_FOLDER + fileName, fileData, {
 				encoding: 'binary'
 			});
+		}
 
+		/**
+		 * Retrieves console format using ConsoleID.py.
+		 * 
+		 * Returns undefined if an error occurred, otherwise returns an array of potential console formats.
+		 */
+		function getConsoleFormat(fileData, fileName) {
 			// set args (to monkey patch sys.argv)
-			pyodide.globals.set('args', `./GameID.py -i ${INPUT_FOLDER + fileName} -c ${format} -d db.pkl.gz -o ${OUTPUT_FILE}`);
+			pyodide.globals.set('args', `./ConsoleID.py -i ${INPUT_FOLDER + fileName} -o ${CONSOLEID_OUTPUT_FILE}`);
+
+			// run the python code
+			try {
+				pyodide.runPython(consoleIDWebPy);
+			} catch (e) {
+				console.log(e);
+				alert("An error occurred when trying to auto-detect the file. Note that auto-detection may not neccesarily work on all files.");
+				postRun();
+				return;
+			}
+
+			// read the output file
+			const output = pyodide.FS.readFile(PYODIDE_ROOT + CONSOLEID_OUTPUT_FILE, { encoding: 'utf8' });
+			// add the detected formats to the output table
+			const outputTableBody = document.getElementById('output-table-body');
+			const tr = document.createElement('tr');
+			// each of the columns' text values for this new row 
+			const columns = ['Auto-Detected Console(s):', output];
+			for (const column of columns) {
+				const td = document.createElement('td');
+				td.classList.add('ps-3')
+				td.innerText = column;
+				tr.appendChild(td);
+			}
+			outputTableBody.appendChild(tr);
+			return output.split('/');
+		}
+
+		/**
+		 * Runs GameID.py
+		 * 
+		 * Returns false if an error occurred, true otherwise.
+		 */
+		function runGameID(fileData, fileName, format) {
+			// set args (to monkey patch sys.argv)
+			pyodide.globals.set('args', `./GameID.py -i ${INPUT_FOLDER + fileName} -c ${format} -d db.pkl.gz -o ${GAMEID_OUTPUT_FILE}`);
 
 			// run the python code
 			try {
 				pyodide.runPython(gameIDWebPy);
 			} catch (e) {
-				if(fileName.toLowerCase().endsWith(".cue") || fileName.toLowerCase().endsWith(".cue.gz")) {
+				console.log(e);
+				if (fileName.toLowerCase().endsWith(".cue") || fileName.toLowerCase().endsWith(".cue.gz")) {
 					alert("For BIN/CUE games, select the BIN file. If there are multiple BINs, select the first track.");
 				} else {
 					alert("An error occurred. Ensure the input file is correct and try again.");
 				}
-				document.getElementById('run').innerText = 'Run';
-				document.getElementById('run').disabled = false;
-				return;
+				postRun();
+				return false;
 			}
 
 			// read the output file
-			const output = pyodide.FS.readFile(PYODIDE_ROOT + OUTPUT_FILE, { encoding: 'utf8' });
+			const output = pyodide.FS.readFile(PYODIDE_ROOT + GAMEID_OUTPUT_FILE, { encoding: 'utf8' });
 			const lines = output.split('\n');
 			if (lines[lines.length - 1] === '') {
 				lines.pop();
@@ -304,6 +392,7 @@
 				// parse each line and add elements in the output table
 				const outputTableBody = document.getElementById('output-table-body');
 				const tr = document.createElement('tr');
+				// each of the columns' text values for this new row
 				const columns = line.split('\t');
 				for (const column of columns) {
 					const td = document.createElement('td');
@@ -314,6 +403,11 @@
 				outputTableBody.appendChild(tr);
 			}
 
+			postRun();
+			return true;
+		}
+
+		function postRun() {
 			// update output
 			document.getElementById('run').innerText = 'Run';
 			document.getElementById('run').disabled = false;
