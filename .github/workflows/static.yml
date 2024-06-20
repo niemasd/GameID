@@ -39,6 +39,7 @@ jobs:
       - name: Copy over static content
         run: |
           cp ../GameID.py ./assets/ && \
+          cp ../ConsoleID.py ./assets/ && \
           cp ../README.md ./assets/ && \
           cp ../db.pkl.gz ./assets/ && \
           cp ../example/GameCube-240pSuite-1.17.iso ./assets/ 
