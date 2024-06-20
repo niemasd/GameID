@@ -7,7 +7,6 @@ ConsoleID: Identify the console of a game
 from glob import glob
 from gzip import open as gopen
 from os.path import abspath, expanduser, isdir, isfile
-import sys
 import argparse
 
 # non-standard imports
