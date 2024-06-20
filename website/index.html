@@ -330,7 +330,7 @@
 		 */
 		function getConsoleFormat(fileData, fileName) {
 			// set args (to monkey patch sys.argv)
-			pyodide.globals.set('args', `./ConsoleID.py -i ${INPUT_FOLDER + fileName} -o ${CONSOLEID_OUTPUT_FILE}`);
+			pyodide.globals.set('args_ConsoleID', `./ConsoleID.py -i ${INPUT_FOLDER + fileName} -o ${CONSOLEID_OUTPUT_FILE}`);
 
 			// run the python code
 			try {
@@ -366,7 +366,7 @@
 		 */
 		function runGameID(fileData, fileName, format) {
 			// set args (to monkey patch sys.argv)
-			pyodide.globals.set('args', `./GameID.py -i ${INPUT_FOLDER + fileName} -c ${format} -d db.pkl.gz -o ${GAMEID_OUTPUT_FILE}`);
+			pyodide.globals.set('args_GameID', `./GameID.py -i ${INPUT_FOLDER + fileName} -c ${format} -d db.pkl.gz -o ${GAMEID_OUTPUT_FILE}`);
 
 			// run the python code
 			try {

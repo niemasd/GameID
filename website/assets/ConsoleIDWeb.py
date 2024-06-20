@@ -1,6 +1,6 @@
 import ConsoleID
 
-if ('args' in globals()):
+if ('args_ConsoleID' in globals()):
     # set command line arguments, from javascript
-    ConsoleID.sys.argv = args.split()
+    ConsoleID.sys.argv = args_ConsoleID.split()
     ConsoleID.main()
