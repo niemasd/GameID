@@ -1,4 +1,6 @@
 # Files are already in repository, copied over so the site can access them
 # During deployment of the site, the GH action copies the files from the repository to the site
-GameID.py
-README.md
+assets/GameID.py
+assets/ConsoleID.py
+assets/README.md
+assets/db.pkl.gz
