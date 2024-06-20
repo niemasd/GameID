@@ -17,6 +17,7 @@ from pycdlib import PyCdlib
 
 # ConsoleID constants
 MAX_SIZE_CD = 734003200 # 700 MiB
+HEADER_SIZE = 1000000 # how many bytes to read when attempting to manually detect game from raw data
 CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetypes
     '3DS':       {'3ds', 'cia'},                              # Nintendo 3DS
     'Amiga':     {'adf', 'adz', 'dms', 'ipf'},                # Amiga
@@ -49,6 +50,9 @@ CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetype
 }
 EXT2CONSOLE = {ext:console for console in CONSOLE_EXTS for ext in CONSOLE_EXTS[console] if len([c for c,es in CONSOLE_EXTS.items() if ext in es]) == 1}
 ISO9660_EXTS = {'bin', 'cue', 'iso'}
+
+# console-specific constants
+GC_MAGIC_WORD = bytes([0xc2, 0x33, 0x9f, 0x3d])
 
 # parse user arguments
 def parse_args():
@@ -116,6 +120,14 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
     ext = get_extension(fn)
     if console is None and ext in EXT2CONSOLE:
         console = EXT2CONSOLE[ext]
+
+    # next try to identify based on raw data from beginning of file
+    if console is None and not isdir(fn):
+        f = open_file(fn, mode='rb'); header = f.read(HEADER_SIZE); f.close()
+
+        # check GameCube: https://hitmen.c02.at/files/yagcd/yagcd/chap13.html#sec13
+        if header[0x001c : 0x0020] == GC_MAGIC_WORD:
+            console = 'GC'
 
     # next try to identify ISO 9660 game (e.g. PSX, PS2, etc.)
     if console is None and (ext in ISO9660_EXTS or isdir(fn)):
