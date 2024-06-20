@@ -53,6 +53,7 @@ ISO9660_EXTS = {'bin', 'cue', 'iso'}
 
 # console-specific constants
 GC_MAGIC_WORD = bytes([0xc2, 0x33, 0x9f, 0x3d])
+SATURN_MAGIC_WORD = 'SEGA SEGASATURN'
 
 # parse user arguments
 def parse_args():
@@ -83,8 +84,12 @@ def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
 
         # if image, get root files from ISO 9660
         else:
-            iso = PyCdlib(); iso_fp = ISO9660FP(fn, 'rb'); iso.open_fp(iso_fp)
-            root_files = {f.file_identifier().decode().rstrip(';1').strip().upper():f for f in iso.list_children(iso_path='/')}
+            try: # try to use pycdlib
+                iso = PyCdlib(); iso_fp = ISO9660FP(fn, 'rb'); iso.open_fp(iso_fp)
+                root_files = {f.file_identifier().decode().lstrip('/').rstrip(';1').strip().upper():f for f in iso.list_children(iso_path='/')}
+            except: # use my ISO9660 implementation if pycdlib fails
+                iso = ISO9660(fn)
+                root_files = {tup[0].lstrip('/').rstrip(';1').strip().upper():tup for tup in iso.get_filenames(only_root_dir=True)}
 
         # check PSP
         if 'UMD_DATA.BIN' in root_files:
@@ -104,13 +109,6 @@ def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
     except:
         pass
 
-    # check block size
-    try:
-        if ISO9660(fn).block_size == 2352: # assume all ISO 9660 images with a block size of 2352 are PSX games
-            return 'PSX'
-    except:
-        pass
-
 # main logic to identify a console
 def identify(fn, bufsize=DEFAULT_BUFSIZE):
     # set things up
@@ -123,11 +121,19 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
 
     # next try to identify based on raw data from beginning of file
     if console is None and not isdir(fn):
-        f = open_file(fn, mode='rb'); header = f.read(HEADER_SIZE); f.close()
+        if ext == 'cue':
+            f = open_file(bins_from_cue(fn)[0], mode='rb')
+        else:
+            f = open_file(fn, mode='rb')
+        header = f.read(HEADER_SIZE); f.close()
 
         # check GameCube: https://hitmen.c02.at/files/yagcd/yagcd/chap13.html#sec13
         if header[0x001c : 0x0020] == GC_MAGIC_WORD:
             console = 'GC'
+
+        # check Saturn
+        elif header[0x0010 : 0x001F].decode() == SATURN_MAGIC_WORD:
+            console = 'Saturn'
 
     # next try to identify ISO 9660 game (e.g. PSX, PS2, etc.)
     if console is None and (ext in ISO9660_EXTS or isdir(fn)):
