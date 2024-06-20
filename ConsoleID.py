@@ -7,11 +7,11 @@ ConsoleID: Identify the console of a game
 from glob import glob
 from gzip import open as gopen
 from os.path import abspath, expanduser, isdir, isfile
-from sys import stderr
+import sys
 import argparse
 
 # non-standard imports
-from GameID import bins_from_cue, check_exists, DEFAULT_BUFSIZE, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
+from GameID import bins_from_cue, check_exists, check_not_exists, DEFAULT_BUFSIZE, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
 from pycdlib import PyCdlib
 
 # ConsoleID constants
