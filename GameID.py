@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.19'
+VERSION = '1.0.20'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -189,22 +189,28 @@ class MOUNTED_DISC:
 # helper class to handle ISO 9660 disc images
 class ISO9660:
     # initialize ISO handling
-    def __init__(self, fn, bufsize=DEFAULT_BUFSIZE):
+    def __init__(self, fn, quiet=False, bufsize=DEFAULT_BUFSIZE):
         if fn.split('.')[-1].strip().lower() in {'7z', 'zip'}:
-            error("%s files are not yet supported" % (fn.split('.')[-1].strip().lower()))
+            if quiet:
+                error()
+            else:
+                error("%s files are not yet supported" % (fn.split('.')[-1].strip().lower()))
         self.fn = abspath(expanduser(fn)); self.size = getsize(fn)
         if fn.lower().endswith('.cue'):
             self.bins = bins_from_cue(fn)
             self.size = sum(getsize(b) for b in self.bins)
-            self.f = open_file(self.bins[0], 'rb', bufsize=bufsize)
+            self.f = ISO9660FP(self.bins[0])
         else:
-            self.f = open_file(self.fn, 'rb', bufsize=bufsize)
+            self.f = ISO9660FP(self.fn)
         if (self.size % 2352) == 0:
             self.block_size = 2352
         elif (self.size % 2048) == 0:
             self.block_size = 2048
         else:
-            error("Invalid disc image block size: %s" % fn)
+            if quiet:
+                error()
+            else:
+                error("Invalid disc image block size: %s" % fn)
 
         # block size 2352 starts at 0x18: https://github.com/cebix/ff7tools/blob/21dd8e29c1f1599d7c776738b1df20f2e9c06de0/ff7/cd.py#L30-L40
         if self.block_size == 2352:
@@ -311,8 +317,8 @@ class ISO9660:
 
 # helper class to serve as a file pointer for pycdlib (to support GZIP, weird PSX discs, etc.)
 class ISO9660FP:
-    # constrctor
-    def __init__(self, fn, mode, start_offset=0, bufsize=DEFAULT_BUFSIZE):
+    # constructor
+    def __init__(self, fn, mode='rb', start_offset=0, bufsize=DEFAULT_BUFSIZE):
         self.f = open_file(fn, mode, bufsize=bufsize)
         self.mode = mode; self.start_offset = start_offset
 
@@ -957,7 +963,8 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
 
 # dictionary storing all identify functions
 IDENTIFY = {
-    'GB/GBC':  identify_gb_gbc,
+    'GB':      identify_gb_gbc,
+    'GBC':     identify_gb_gbc,
     'GBA':     identify_gba,
     'GC':      identify_gc,
     'Genesis': identify_genesis,

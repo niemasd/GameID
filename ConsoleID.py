@@ -6,6 +6,7 @@ ConsoleID: Identify the console of a game
 # standard imports
 from glob import glob
 from gzip import open as gopen
+from io import BytesIO
 from os.path import abspath, expanduser, isdir, isfile
 import argparse
 import sys
@@ -74,28 +75,28 @@ def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
     try:
         # if directory, get root files directly
         if isdir(fn):
-            root_files = {s.split('/')[-1].strip() for s in glob('%s/*' % fn)}
+            iso = None; root_files = {s.split('/')[-1].rstrip(';1').strip().upper():s for s in glob('%s/*' % fn)}
 
         # if image, get root files from ISO 9660
         else:
-            iso = PyCdlib(); iso.open_fp(ISO9660FP(fn,'rb'))
-            root_files = {f.file_identifier().decode().strip().upper():f for f in iso.list_children(iso_path='/')}
+            iso = PyCdlib(); iso_fp = ISO9660FP(fn, 'rb'); iso.open_fp(iso_fp)
+            root_files = {f.file_identifier().decode().rstrip(';1').strip().upper():f for f in iso.list_children(iso_path='/')}
 
         # check PSP
         if 'UMD_DATA.BIN' in root_files:
             return 'PSP'
 
         # check PSX/PS2
-        elif 'SYSTEM.CNF' in root_files or 'SYSTEM.CNF;1' in root_files:
-            # first check image size
-            if get_extension(fn) == 'cue':
-                size = sum(getsize(b) for b in bins_from_cue(fn))
-            else:
-                size = getsize(fn)
-            if size > MAX_SIZE_CD: # if image is larger than CD, must be PS2
+        elif 'SYSTEM.CNF' in root_files:
+            if iso is None: # directory
+                system_cnf = open(root_files['SYSTEM.CNF'], 'rb').read().decode()
+            else: # ISO 9660
+                iso_fp.seek(root_files['SYSTEM.CNF'].fp_offset)
+                system_cnf = iso_fp.read(root_files['SYSTEM.CNF'].get_data_length()).decode()
+            if 'BOOT2' in system_cnf:
                 return 'PS2'
-            else:
-                return 'PSX/PS2' # TODO need to figure out how to distinguish PSX vs small PS2 images
+            elif 'BOOT' in system_cnf:
+                return 'PSX'
     except:
         pass
 
