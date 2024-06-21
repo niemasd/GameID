@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.22'
+VERSION = '1.0.23'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -672,7 +672,7 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         'target_area_symbols': header[0x0050 : 0x0060].decode().strip(),
         'internal_title':      header[0x0070 : 0x00E0].decode().strip(),
     }
-    serial = out['ID'].replace('-','').strip()
+    serial = out['ID'].replace('-','').replace(' ','').strip()
 
     # handle release date
     yyyymmdd = header[0x0040 : 0x0048].decode().strip()
