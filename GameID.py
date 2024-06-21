@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.21'
+VERSION = '1.0.22'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -50,6 +50,9 @@ N64_FIRST_WORD = b'\x80\x37\x12\x40'
 
 # PSX constants
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
+
+# Saturn constants
+SATURN_DEVICE_SUPPORT = {'J': 'Joypad', 'M': 'Mouse', 'G': 'Gun', 'W': 'RAM Cart', 'S': 'Steering Wheel', 'A': 'Virtua Stick or Analog Controller', 'E': 'Analog Controller (3D-pad)', 'T': 'Multi-Tap', 'C': 'Link Cable', 'D': 'Link Cable (Direct Link)', 'X': 'X-Band or Netlink Modem', 'K': 'Keyboard', 'Q': 'Pachinko Controller', 'F': 'Floppy Disk Drive', 'R': 'ROM Cart', 'P': 'Video CD Card (MPEG Movie Card)'}
 
 # SNES constants
 SNES_LOROM_HEADER_START = 0x7FC0
@@ -662,17 +665,25 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         f = open_file(fn, mode='rb')
     header = f.read(0x00E0); f.close()
     out = {
-        'manufacturer_ID':       header[0x0020 : 0x0030].decode().strip(),
-        'ID':                    header[0x0030 : 0x003A].decode().strip(),
-        'version':               header[0x003A : 0x0040].decode().strip(),
-        'device_info':           header[0x0048 : 0x0050].decode().strip(),
-        'target_area_symbols':   header[0x0050 : 0x0060].decode().strip(),
-        'compatible_peripheral': header[0x0060 : 0x0070].decode().strip(),
-        'internal_title':        header[0x0070 : 0x00E0].decode().strip(),
+        'manufacturer_ID':     header[0x0020 : 0x0030].decode().strip(),
+        'ID':                  header[0x0030 : 0x003A].decode().strip(),
+        'version':             header[0x003A : 0x0040].decode().strip(),
+        'device_info':         header[0x0048 : 0x0050].decode().strip(),
+        'target_area_symbols': header[0x0050 : 0x0060].decode().strip(),
+        'internal_title':      header[0x0070 : 0x00E0].decode().strip(),
     }
+    serial = out['ID'].replace('-','').strip()
+
+    # handle release date
     yyyymmdd = header[0x0040 : 0x0048].decode().strip()
     out['release_date'] = '%s-%s-%s' % (yyyymmdd[0:4], yyyymmdd[4:6], yyyymmdd[6:8])
-    serial = out['ID'].replace('-','').strip()
+
+    # handle device support
+    out['device_support'] = list(header[0x0060 : 0x0070].decode().strip())
+    for i in range(len(out['device_support'])):
+        if out['device_support'][i] in SATURN_DEVICE_SUPPORT:
+            out['device_support'][i] = SATURN_DEVICE_SUPPORT[out['device_support'][i]]
+    out['device_support'] = ' / '.join(out['device_support'])
 
     # identify game
     if serial in db['Saturn']:
