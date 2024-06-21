@@ -635,17 +635,48 @@ def identify_gc(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False
     # parse GC ISO header: https://hitmen.c02.at/files/yagcd/yagcd/chap13.html#sec13
     f = open_file(fn, mode='rb'); header = f.read(0x0440); f.close()
     out = {
-        'ID':             header[0x0000 : 0x0004].decode(),
-        'maker_code':     header[0x0004 : 0x0006].decode(),
+        'ID':             header[0x0000 : 0x0004].decode().strip(),
+        'maker_code':     header[0x0004 : 0x0006].decode().strip(),
         'disk_ID':        header[0x0006],
         'version':        header[0x0007],
-        'internal_title': header[0x0020 : 0x0400].decode(),
+        'internal_title': header[0x0020 : 0x0400].decode().strip(),
     }
     serial = out['ID']
 
     # identify game
     if serial in db['GC']:
         gamedb_entry = db['GC'][serial]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    else:
+        out['title'] = out['internal_title'] # 'title' and 'internal_title' will be the same if game not found in GameDB
+    return out
+
+# identify Saturn game
+def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
+    # parse Saturn ISO header
+    if get_extension(fn) == 'cue':
+        f = open_file(bins_from_cue(fn)[0], 'rb')
+    else:
+        f = open_file(fn, mode='rb')
+    header = f.read(0x00E0); f.close()
+    out = {
+        'manufacturer_ID':       header[0x0020 : 0x0030].decode().strip(),
+        'ID':                    header[0x0030 : 0x003A].decode().strip(),
+        'version':               header[0x003A : 0x0040].decode().strip(),
+        'device_info':           header[0x0048 : 0x0050].decode().strip(),
+        'target_area_symbols':   header[0x0050 : 0x0060].decode().strip(),
+        'compatible_peripheral': header[0x0060 : 0x0070].decode().strip(),
+        'internal_title':        header[0x0070 : 0x00E0].decode().strip(),
+    }
+    yyyymmdd = header[0x0040 : 0x0048].decode().strip()
+    out['release_date'] = '%s-%s-%s' % (yyyymmdd[0:4], yyyymmdd[4:6], yyyymmdd[6:8])
+    serial = out['ID'].replace('-','').strip()
+
+    # identify game
+    if serial in db['Saturn']:
+        gamedb_entry = db['Saturn'][serial]
         for k,v in gamedb_entry.items():
             if (k not in out) or prefer_gamedb:
                 out[k] = v
@@ -955,6 +986,7 @@ IDENTIFY = {
     'PSP':     identify_psp,
     'PSX':     identify_psx,
     'PS2':     identify_ps2,
+    'Saturn':  identify_saturn,
     'SNES':    identify_snes,
 }
 

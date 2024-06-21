@@ -128,7 +128,7 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
         header = f.read(HEADER_SIZE); f.close()
 
         # check GameCube: https://hitmen.c02.at/files/yagcd/yagcd/chap13.html#sec13
-        if header[0x001c : 0x0020] == GC_MAGIC_WORD:
+        if header[0x001C : 0x0020] == GC_MAGIC_WORD:
             console = 'GC'
 
         # check Saturn
