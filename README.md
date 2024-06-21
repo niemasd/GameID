@@ -1,13 +1,15 @@
 # GameID
 Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported consoles:
 
-* `GB/GBC` - Nintendo Game Boy (Color)
+* `GB` - Nintendo Game Boy
+* `GBC` - Nintendo Game Boy Color
 * `GBA` - Nintendo Game Boy Advance
 * `GC` - Nintendo GameCube
 * `N64` - Nintendo 64
 * `PSP` - Sony PlayStation Portable
 * `PSX` - Sony PlayStation
 * `PS2` - Sony PlayStation 2
+* `Saturn` - Sega Saturn
 * `SNES` - Super Nintendo Entertainment System
 
 ## Usage
