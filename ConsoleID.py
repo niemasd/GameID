@@ -12,7 +12,7 @@ import argparse
 import sys
 
 # non-standard imports
-from GameID import DEFAULT_BUFSIZE, GC_MAGIC_WORD, SATURN_MAGIC_WORD, SEGACD_MAGIC_WORDS
+from GameID import DEFAULT_BUFSIZE, GC_MAGIC_WORD, GENESIS_MAGIC_WORDS, SATURN_MAGIC_WORD, SEGACD_MAGIC_WORDS
 from GameID import bins_from_cue, check_exists, check_not_exists, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
 from pycdlib import PyCdlib
 
@@ -130,6 +130,15 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
                 if header[i : i + 4] == GC_MAGIC_WORD:
                     console = 'GC'; break
 
+        # check Genesis
+        if console is None:
+            for magic_word in GENESIS_MAGIC_WORDS:
+                for i in range(0x100, 0x200): # # 0x200 is arbitrary; too big = slow if not a Genesis game
+                    if header[i : i + len(magic_word)] == magic_word:
+                        console = 'Genesis'; break
+                if console is not None:
+                    break
+
         # check Saturn
         if console is None:
             for i in range(0x100): # 0x100 is arbitrary; too big = slow if not a Saturn game
@@ -139,7 +148,7 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
         # check SegaCD
         if console is None:
             for magic_word in SEGACD_MAGIC_WORDS:
-                for i in range(len(header) - len(magic_word) + 1):
+                for i in range(0x100): # 0x100 is arbitrary; too big = slow if not a SegaCD game
                     if header[i : i + len(magic_word)] == magic_word:
                         console = 'SegaCD'; break
                 if console is not None:
