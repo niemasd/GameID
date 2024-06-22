@@ -46,7 +46,7 @@ GC_MAGIC_WORD = bytes([0xc2, 0x33, 0x9f, 0x3d])
 GENESIS_DEVICE_SUPPORT = {'J': '3-button Controller', '6': '6-button Controller', '0': 'Master System Controller', 'A': 'Analog Joystick', '4': 'Multitap', 'G': 'Lightgun', 'L': 'Activator', 'M': 'Mouse', 'B': 'Trackball', 'T': 'Tablet', 'V': 'Paddle', 'K': 'Keyboard or Keypad', 'R': 'RS-232', 'P': 'Printer', 'C': 'CD-ROM (Sega CD)', 'F': 'Floppy Drive', 'D': 'Download'}
 GENESIS_REGION_SUPPORT = {'J': 'Japan', 'U': 'Americas', 'E': 'Europe'}
 GENESIS_SOFTWARE_TYPES = {'GM': 'Game', 'AI': 'Aid', 'OS': 'Boot ROM (TMSS)', 'BR': 'Boot ROM (Sega CD)'}
-GENESIS_SYSTEM_TYPES = {"SEGA MEGA DRIVE", "SEGA GENESIS", "SEGA 32X", "SEGA EVERDRIVE", "SEGA SSF", "SEGA MEGAWIFI", "SEGA PICO", "SEGA TERA68K", "SEGA TERA286"}
+GENESIS_MAGIC_WORDS = [bytes(ord(c) for c in w) for w in ["SEGA GENESIS", "SEGA MEGA DRIVE", "SEGA 32X", "SEGA EVERDRIVE", "SEGA SSF", "SEGA MEGAWIFI", "SEGA PICO", "SEGA TERA68K", "SEGA TERA286"]]
 
 # N64 constants
 N64_FIRST_WORD = b'\x80\x37\x12\x40'
@@ -691,9 +691,12 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         'system_name':    header[magic_word_ind + 0x020 : magic_word_ind + 0x02B],
         'build_date':     header[magic_word_ind + 0x050 : magic_word_ind + 0x058],
         'system_type':    header[magic_word_ind + 0x100 : magic_word_ind + 0x110],
+        'release_year':   header[magic_word_ind + 0x118 : magic_word_ind + 0x11C],
+        'release_month':  header[magic_word_ind + 0x11D : magic_word_ind + 0x120],
         'title_domestic': header[magic_word_ind + 0x120 : magic_word_ind + 0x150],
         'title_overseas': header[magic_word_ind + 0x150 : magic_word_ind + 0x180],
         'ID':             header[magic_word_ind + 0x180 : magic_word_ind + 0x190],
+        'device_support': header[magic_word_ind + 0x190 : magic_word_ind + 0x1A0],
     }
 
     # try to parse output as strings
@@ -723,14 +726,12 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         out['build_date'] = '%s-%s-%s' % (out['build_date'][4:8], out['build_date'][0:2], out['build_date'][2:4])
 
     # release year
-    out['release_year'] = header[magic_word_ind + 0x118 : magic_word_ind + 0x11C]
     try:
         out['release_year'] = int(out['release_year'].decode())
     except:
         pass
 
     # release month
-    out['release_month'] = header[magic_word_ind + 0x11D : magic_word_ind + 0x120]
     try:
         out['release_month'] = out['release_month'].decode().strip()
     except:
@@ -739,13 +740,9 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         out['release_month'] = MONTH_3LET_TO_FULL[out['release_month']]
 
     # device support
-    out['device_support'] = header[magic_word_ind + 0x190 : magic_word_ind + 0x1A0]
     try:
         tmp = list()
-        for v in out['device_support']:
-            if v < ord('!') or v > ord('~'):
-                continue
-            c = chr(v)
+        for c in out['device_support']:
             if c in GENESIS_DEVICE_SUPPORT:
                 tmp.append(GENESIS_DEVICE_SUPPORT[c])
             else:
@@ -753,8 +750,6 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         out['device_support'] = ' / '.join(s for s in sorted(tmp))
     except:
         pass
-    if len(out['device_support']) == 0:
-        device_support = None
 
     # region support
     out['region_support'] = header[magic_word_ind + 0x1F0 : magic_word_ind + 0x1F3]
@@ -771,8 +766,6 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         out['region_support'] = ' / '.join(s for s in sorted(tmp))
     except:
         pass
-    if len(out['region_support']) == 0:
-        out['region_support'] = None
 
     # identify game
     serial = out['ID'].replace('#','').replace('-','').replace(' ','').strip()
@@ -991,156 +984,93 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
     # parse Genesis ROM header: https://plutiedev.com/rom-header
     f = open_file(fn, mode='rb'); data = f.read(); f.close()
 
-    # system type
-    try:
-        system_type = data[0x100 : 0x110].decode().strip()
-    except:
-        system_type = None
-    if system_type not in GENESIS_SYSTEM_TYPES:
-        error("Invalid Genesis ROM: %s" % fn)
+    # search for header starting offset
+    magic_word_ind = None
+    for magic_word in GENESIS_MAGIC_WORDS:
+        for i in range(0x100, 0x200): # # 0x200 is arbitrary; too big = slow if not a Genesis game
+            if data[i : i + len(magic_word)] == magic_word:
+                magic_word_ind = i; break
+        if magic_word_ind is not None:
+            break
+    if magic_word_ind is None:
+        return None # fail if magic word not found (in the future, maybe change to default offset?)
 
-    # publisher
-    publisher = data[0x113 : 0x117]
-    try:
-        publisher = publisher.decode().strip()
-    except:
-        pass
+    # set up output dictionary
+    out = {
+        'system_type':    data[magic_word_ind + 0x000 : magic_word_ind + 0x010],
+        'publisher':      data[magic_word_ind + 0x013 : magic_word_ind + 0x017],
+        'release_year':   data[magic_word_ind + 0x018 : magic_word_ind + 0x01C],
+        'release_month':  data[magic_word_ind + 0x01D : magic_word_ind + 0x020],
+        'title_domestic': data[magic_word_ind + 0x020 : magic_word_ind + 0x050],
+        'title_overseas': data[magic_word_ind + 0x050 : magic_word_ind + 0x080],
+        'software_type':  data[magic_word_ind + 0x080 : magic_word_ind + 0x082],
+        'ID':             data[magic_word_ind + 0x082 : magic_word_ind + 0x08B],
+        'revision':       data[magic_word_ind + 0x08C : magic_word_ind + 0x08E],
+        'checksum':       hex(unpack('>H', data[magic_word_ind + 0x08E : magic_word_ind + 0x090])[0]),
+        'device_support': data[magic_word_ind + 0x090 : magic_word_ind + 0x0A0],
+        'rom_start':      hex(unpack('>I', data[magic_word_ind + 0x0A0 : magic_word_ind + 0x0A4])[0]),
+        'rom_end':        hex(unpack('>I', data[magic_word_ind + 0x0A4 : magic_word_ind + 0x0A8])[0]),
+        'ram_start':      hex(unpack('>I', data[magic_word_ind + 0x0A8 : magic_word_ind + 0x0AC])[0]),
+        'ram_end':        hex(unpack('>I', data[magic_word_ind + 0x0AC : magic_word_ind + 0x0B0])[0]),
+        'modem_support':  data[magic_word_ind + 0x0BC : magic_word_ind + 0x0C8],
+        'region_support': data[magic_word_ind + 0x0F0 : magic_word_ind + 0x0F3],
+    }
+
+    # try to parse output as strings
+    for k in list(out.keys()):
+        if isinstance(out[k], bytes):
+            try:
+                out[k] = out[k].decode().strip()
+            except:
+                pass
 
     # release year
-    release_year = data[0x118 : 0x11C]
     try:
-        release_year = int(release_year.decode())
+        out['release_year'] = int(out['release_year'].decode())
     except:
         pass
 
     # release month
-    release_month = data[0x11D : 0x120]
     try:
-        release_month = release_month.decode().strip()
+        out['release_month'] = out['release_month'].decode().strip()
     except:
         pass
-    if release_month in MONTH_3LET_TO_FULL:
-        release_month = MONTH_3LET_TO_FULL[release_month]
-
-    # domestic title
-    title_domestic = data[0x120 : 0x150]
-    try:
-        title_domestic = title_domestic.decode().strip()
-    except:
-        pass
-
-    # overseas title
-    title_overseas = data[0x150 : 0x180]
-    try:
-        title_overseas = title_overseas.decode().strip()
-    except:
-        pass
+    if out['release_month'] in MONTH_3LET_TO_FULL:
+        out['release_month'] = MONTH_3LET_TO_FULL[out['release_month']]
 
     # software type
-    software_type = data[0x180 : 0x182]
-    try:
-        software_type = software_type.decode().strip()
-    except:
-        pass
-    if software_type in GENESIS_SOFTWARE_TYPES:
-        software_type = GENESIS_SOFTWARE_TYPES[software_type]
-
-    # serial
-    serial = data[0x182 : 0x18B]
-    try:
-        serial = serial.decode().strip()
-    except:
-        pass
-
-    # revision
-    revision = data[0x18C : 0x18E]
-    try:
-        revision = revision.decode().strip()
-    except:
-        pass
-
-    # checksum
-    checksum = unpack('>H', data[0x18E : 0x190])[0]
+    if out['software_type'] in GENESIS_SOFTWARE_TYPES:
+        out['software_type'] = GENESIS_SOFTWARE_TYPES[out['software_type']]
 
     # device support
-    device_support = data[0x190 : 0x1A0]
     try:
         tmp = list()
-        for v in device_support:
-            if v < ord('!') or v > ord('~'):
-                continue
-            c = chr(v)
+        for c in out['device_support']:
             if c in GENESIS_DEVICE_SUPPORT:
                 tmp.append(GENESIS_DEVICE_SUPPORT[c])
             else:
                 tmp.append(c)
-        device_support = ' / '.join(s for s in sorted(tmp))
+        out['device_support'] = ' / '.join(s for s in sorted(tmp))
     except:
         pass
-    if len(device_support) == 0:
-        device_support = None
-
-    # ROM/RAM start/end
-    rom_start = unpack('>I', data[0x1A0 : 0x1A4])[0]
-    rom_end = unpack('>I', data[0x1A4 : 0x1A8])[0]
-    ram_start = unpack('>I', data[0x1A8 : 0x1AC])[0]
-    ram_end = unpack('>I', data[0x1AC : 0x1B0])[0]
-
-    # extra memory
-    extra_memory = data[0x1B0 : 0x1BC]
-
-    # modem support
-    modem_support = data[0x1BC : 0x1C8]
-    try:
-        modem_support = modem_support.decode().strip()
-    except:
-        pass
-    if len(modem_support) == 0:
-        modem_support = None
 
     # region support
-    region_support = data[0x1F0 : 0x1F3]
     try:
         tmp = list()
-        for v in region_support:
-            if v < ord('!') or v > ord('~'):
-                continue
-            c = chr(v)
+        for c in out['region_support']:
             if c in GENESIS_REGION_SUPPORT:
                 tmp.append(GENESIS_REGION_SUPPORT[c])
             else:
                 tmp.append(c)
-        region_support = ' / '.join(s for s in sorted(tmp))
+        out['region_support'] = ' / '.join(s for s in sorted(tmp))
     except:
         pass
-    if len(region_support) == 0:
-        region_support = None
 
     # identify game
-    out = {
-        'system_type': system_type,
-        'publisher': publisher,
-        'release_year': release_year,
-        'release_month': release_month,
-        'title_domestic': title_domestic,
-        'title_overseas': title_overseas,
-        'software_type': software_type,
-        'ID': serial,
-        'revision': revision,
-        'checksum': '0x%s' % hex(checksum)[2:].zfill(4),
-        'device_support': device_support,
-        'rom_start': '0x%s' % hex(rom_start)[2:].zfill(8),
-        'rom_end': '0x%s' % hex(rom_end)[2:].zfill(8),
-        'ram_start': '0x%s' % hex(ram_start)[2:].zfill(8),
-        'ram_end': '0x%s' % hex(ram_end)[2:].zfill(8),
-        'extra_memory': '0x%s' % ''.join(hex(v)[2:].zfill(2) for v in extra_memory),
-        'modem_support': modem_support,
-        'region_support': region_support,
-    }
-    if isinstance(serial, str):
-        gamedb_ID = ''.join(c if c in SAFE else '_' for c in serial).replace('-','')
-        if gamedb_ID in db['Genesis']:
-            gamedb_entry = db['Genesis'][gamedb_ID]
+    if isinstance(out['ID'], str):
+        serial = ''.join(c if c in SAFE else '_' for c in out['ID']).replace('-','')
+        if serial in db['Genesis']:
+            gamedb_entry = db['Genesis'][serial]
             for k,v in gamedb_entry.items():
                 if (k not in out) or prefer_gamedb:
                     out[k] = v
@@ -1177,6 +1107,9 @@ def main():
     meta = IDENTIFY[args.console](args.input, db, user_uuid=args.disc_uuid, user_volume_ID=args.disc_label, prefer_gamedb=args.prefer_gamedb)
     if meta is None:
         error("%s game not found: %s" % (args.console, args.input))
+    for k,v in meta.items(): # replace empty string values with 'None'
+        if isinstance(v, str) and len(v.strip()) == 0:
+            meta[k] = 'None'
     f_out = open_file(args.output, 'wt')
     print('\n'.join('%s%s%s' % (k,args.delimiter,v) for k,v in meta.items()), file=f_out)
     f_out.close()
