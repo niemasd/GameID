@@ -11,7 +11,7 @@ from sys import argv
 from urllib.request import urlopen
 
 # constants
-CONSOLES = {'GB', 'GBA', 'GBC', 'GC', 'Genesis', 'N64', 'PSP', 'PSX', 'PS2', 'Saturn', 'SNES'}
+CONSOLES = {'GB', 'GBA', 'GBC', 'GC', 'Genesis', 'N64', 'PSP', 'PSX', 'PS2', 'Saturn', 'SegaCD', 'SNES'}
 
 # get GameDB URL
 def get_url(console):
@@ -60,6 +60,10 @@ if __name__ == "__main__":
     print("Fixing GC database...")
     db['GC'] = {k.split('-')[1].strip():v for k,v in db['GC'].items()}
 
+    # fix Genesis (delete spaces and dashes)
+    print("Fixing Genesis database...")
+    db['Genesis'] = {k.strip().split(' ')[0].replace('-','').replace(' ','').strip():v for k,v in db['Genesis'].items()}
+
     # fix N64 (only keep last 3 letters of middle part of NUS-NXXX-XXX serial)
     print("Fixing N64 database...")
     db['N64'] = {k.split('-')[1][1:]:v for k,v in db['N64'].items()}
@@ -84,9 +88,13 @@ if __name__ == "__main__":
             counts[prefix] += 1
         db['GAMEID'][console]['ID_PREFIXES'] = sorted(counts.keys(), key=lambda x: counts[x], reverse=True)
 
-    # fix Saturn (delete dashes)
+    # fix Saturn (delete spaces and dashes)
     print("Fixing Saturn database...")
     db['Saturn'] = {k.strip().split(' ')[0].replace('-','').replace(' ','').strip():v for k,v in db['Saturn'].items()}
+
+    # fix SegaCD (delete spaces and dashes)
+    print("Fixing SegaCD database...")
+    db['SegaCD'] = {k.strip().split(' ')[0].replace('-','').replace(' ','').strip():v for k,v in db['SegaCD'].items()}
 
     # fix SNES: keys = (developer_ID, internal_title, rom_version, checksum) tuples
     print("Fixing SNES database...")

@@ -12,7 +12,7 @@ import argparse
 import sys
 
 # non-standard imports
-from GameID import DEFAULT_BUFSIZE, GC_MAGIC_WORD, SATURN_MAGIC_WORD
+from GameID import DEFAULT_BUFSIZE, GC_MAGIC_WORD, SATURN_MAGIC_WORD, SEGACD_MAGIC_WORDS
 from GameID import bins_from_cue, check_exists, check_not_exists, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
 from pycdlib import PyCdlib
 
@@ -135,6 +135,15 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
             for i in range(0x100): # 0x100 is arbitrary; too big = slow if not a Saturn game
                 if header[i : i + 0xF] == SATURN_MAGIC_WORD:
                     console = 'Saturn'; break
+
+        # check SegaCD
+        if console is None:
+            for magic_word in SEGACD_MAGIC_WORDS:
+                for i in range(len(header) - len(magic_word) + 1):
+                    if header[i : i + len(magic_word)] == magic_word:
+                        console = 'SegaCD'; break
+                if console is not None:
+                    break
 
     # next try to identify ISO 9660 game (e.g. PSX, PS2, etc.)
     if console is None and (ext in ISO9660_EXTS or isdir(fn)):

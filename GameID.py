@@ -59,6 +59,9 @@ SATURN_MAGIC_WORD = bytes(ord(c) for c in 'SEGA SEGASATURN')
 SATURN_DEVICE_SUPPORT = {'J': 'Joypad', 'M': 'Mouse', 'G': 'Gun', 'W': 'RAM Cart', 'S': 'Steering Wheel', 'A': 'Virtua Stick or Analog Controller', 'E': 'Analog Controller (3D-pad)', 'T': 'Multi-Tap', 'C': 'Link Cable', 'D': 'Link Cable (Direct Link)', 'X': 'X-Band or Netlink Modem', 'K': 'Keyboard', 'Q': 'Pachinko Controller', 'F': 'Floppy Disk Drive', 'R': 'ROM Cart', 'P': 'Video CD Card (MPEG Movie Card)'}
 SATURN_TARGET_AREAS = {'J': 'Japan', 'T': 'Asia NTSC (Taiwan, Philippines)', 'U': 'North America (USA, Canada)', 'B': 'Central and South America NTSC (Brazil)', 'K': 'Korea', 'A': 'East Asia PAL (China, Middle and Near East)', 'E': 'Europe PAL', 'L': 'Central and South America PAL'}
 
+# SegaCD constants
+SEGACD_MAGIC_WORDS = [bytes(ord(c) for c in w) for w in ['SEGADISCSYSTEM', 'SEGABOOTDISC', 'SEGADISC', 'SEGADATADISC']]
+
 # SNES constants
 SNES_LOROM_HEADER_START = 0x7FC0
 SNES_HIROM_HEADER_START = 0xFFC0
@@ -661,6 +664,49 @@ def identify_gc(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False
         out['title'] = out['internal_title'] # 'title' and 'internal_title' will be the same if game not found in GameDB
     return out
 
+# identify SegaCD game
+def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
+    # read SegaCD ISO header
+    if get_extension(fn) == 'cue':
+        f = open_file(bins_from_cue(fn)[0], 'rb')
+    else:
+        f = open_file(fn, mode='rb')
+    header = f.read(0x100); f.close() # 0x100 is arbitrary; too small = won't find SegaCD magic word
+
+    # search for header starting offset
+    magic_word_ind = None
+    for magic_word in SEGACD_MAGIC_WORDS:
+        for i in range(len(header) - len(magic_word) + 1):
+            if header[i : i + len(magic_word)] == magic_word:
+                magic_word_ind = i; break
+        if magic_word_ind is not None:
+            break
+    if magic_word_ind is None:
+        return None # fail if magic word not found (in the future, maybe change to default offset?)
+
+    # set up output dictionary
+    out = {
+        'volume_ID':   header[magic_word_ind + 0x010 : magic_word_ind + 0x01B].decode().strip(),
+        'system_name': header[magic_word_ind + 0x020 : magic_word_ind + 0x02B].decode().strip(),
+        # TODO CONTINUE: https://github.com/niemasd/GameDB-SegaCD/wiki
+    }
+    serial = None # TODO
+    out['internal_title'] = None # TODO
+
+    # handle release date
+    mmddyyyy = header[magic_word_ind + 0x50 : magic_word_ind + 0x58].decode().strip()
+    out['release_date'] = '%s-%s-%s' % (mmddyyyy[4:8], mmddyyyy[0:2], mmddyyyy[2:4])
+
+    # identify game
+    if serial in db['SegaCD']:
+        gamedb_entry = db['SegaCD'][serial]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    else:
+        out['title'] = out['internal_title'] # 'title' and 'internal_title' will be the same if game not found in GameDB
+    return out
+
 # identify Saturn game
 def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # read Saturn ISO header
@@ -676,7 +722,7 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         if header[i : i + len(SATURN_MAGIC_WORD)] == SATURN_MAGIC_WORD:
             magic_word_ind = i; break
     if magic_word_ind is None:
-        return None
+        return None # fail if magic word not found (in the future, maybe change to default offset?)
 
     # set up output dictionary
     out = {
@@ -1034,7 +1080,7 @@ IDENTIFY = {
     'PSX':       identify_psx,
     'PS2':       identify_ps2,
     'Saturn':    identify_saturn,
-    #'SegaCD':    identify_segacd, # TODO
+    'SegaCD':    identify_segacd,
     'SNES':      identify_snes,
 }
 
