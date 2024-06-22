@@ -776,6 +776,8 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
 
     # identify game
     serial = out['ID'].replace('#','').replace('-','').replace(' ','').strip()
+    if serial not in db['SegaCD'] and serial.startswith('MK'):
+        serial = serial[2:].strip()
     if serial in db['SegaCD']:
         gamedb_entry = db['SegaCD'][serial]
         for k,v in gamedb_entry.items():
