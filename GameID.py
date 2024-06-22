@@ -57,6 +57,7 @@ PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
 # Saturn constants
 SATURN_MAGIC_WORD = bytes(ord(c) for c in 'SEGA SEGASATURN')
 SATURN_DEVICE_SUPPORT = {'J': 'Joypad', 'M': 'Mouse', 'G': 'Gun', 'W': 'RAM Cart', 'S': 'Steering Wheel', 'A': 'Virtua Stick or Analog Controller', 'E': 'Analog Controller (3D-pad)', 'T': 'Multi-Tap', 'C': 'Link Cable', 'D': 'Link Cable (Direct Link)', 'X': 'X-Band or Netlink Modem', 'K': 'Keyboard', 'Q': 'Pachinko Controller', 'F': 'Floppy Disk Drive', 'R': 'ROM Cart', 'P': 'Video CD Card (MPEG Movie Card)'}
+SATURN_TARGET_AREAS = {'J': 'Japan', 'T': 'Asia NTSC (Taiwan, Philippines)', 'U': 'North America (USA, Canada)', 'B': 'Central and South America NTSC (Brazil)', 'K': 'Korea', 'A': 'East Asia PAL (China, Middle and Near East)', 'E': 'Europe PAL', 'L': 'Central and South America PAL'}
 
 # SNES constants
 SNES_LOROM_HEADER_START = 0x7FC0
@@ -683,7 +684,6 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         'ID':                  header[magic_word_ind + 0x20 : magic_word_ind + 0x2A].decode().strip().split(' ')[0].strip(),
         'version':             header[magic_word_ind + 0x2A : magic_word_ind + 0x30].decode().strip(),
         'device_info':         header[magic_word_ind + 0x38 : magic_word_ind + 0x40].decode().strip(),
-        'target_area_symbols': header[magic_word_ind + 0x40 : magic_word_ind + 0x50].decode().strip(),
     }
     try:
         out['internal_title'] = header[magic_word_ind + 0x60 : magic_word_ind + 0xD0].decode().strip()
@@ -701,6 +701,13 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         if out['device_support'][i] in SATURN_DEVICE_SUPPORT:
             out['device_support'][i] = SATURN_DEVICE_SUPPORT[out['device_support'][i]]
     out['device_support'] = ' / '.join(out['device_support'])
+
+    # handle target areas
+    out['target_area'] = list(header[magic_word_ind + 0x40 : magic_word_ind + 0x50].decode().strip())
+    for i in range(len(out['target_area'])):
+        if out['target_area'][i] in SATURN_TARGET_AREAS:
+            out['target_area'][i] = SATURN_TARGET_AREAS[out['target_area'][i]]
+    out['target_area'] = ' / '.join(out['target_area'])
 
     # identify game
     if serial in db['Saturn']:
@@ -1016,7 +1023,7 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
 
 # dictionary storing all identify functions
 IDENTIFY = {
-    #'Dreamcast': identify_dreamcast,
+    #'Dreamcast': identify_dreamcast, # TODO
     'GB':        identify_gb_gbc,
     'GBC':       identify_gb_gbc,
     'GBA':       identify_gba,
@@ -1027,6 +1034,7 @@ IDENTIFY = {
     'PSX':       identify_psx,
     'PS2':       identify_ps2,
     'Saturn':    identify_saturn,
+    #'SegaCD':    identify_segacd, # TODO
     'SNES':      identify_snes,
 }
 
