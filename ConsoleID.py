@@ -94,9 +94,13 @@ def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
 
         # check PSX/PS2
         elif 'SYSTEM.CNF' in root_files:
-            if iso is None: # directory
+            if isinstance(root_files['SYSTEM.CNF'], str): # directory
                 system_cnf = open(root_files['SYSTEM.CNF'], 'rb').read().decode()
-            else: # ISO 9660
+            elif isinstance(root_files['SYSTEM.CNF'], tuple): # my ISO9660 implementation
+                tmp_fn, tmp_lba, tmp_size = root_files['SYSTEM.CNF']
+                f = open(iso.bins[0],'rb'); f.seek((tmp_lba * iso.block_size) + 24)
+                system_cnf = f.read(tmp_size).decode(); f.close()
+            else: # PyCdlib
                 iso_fp.seek(root_files['SYSTEM.CNF'].fp_offset)
                 system_cnf = iso_fp.read(root_files['SYSTEM.CNF'].get_data_length()).decode()
             if 'BOOT2' in system_cnf:
