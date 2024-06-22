@@ -838,17 +838,6 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         out['title'] = out['internal_title'] # 'title' and 'internal_title' will be the same if game not found in GameDB
     return out
 
-# identify Dreamcast game
-def identify_dreamcast(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
-    # parse Dreamcast ISO header
-    if get_extension(fn) == 'cue': # TODO CHANGE TO GDI
-        f = open_file(bins_from_cue(fn)[0], 'rb')
-    else:
-        f = open_file(fn, mode='rb')
-    header = f.read(0x00E0); f.close() # TODO CHECK HEADER LENGTH
-    out = { # TODO
-    }
-
 # helper function convert N64 data between little-endian and big-endian
 def n64_convert_endianness(data):
     if len(data) % 2 != 0:
@@ -1080,7 +1069,6 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
 
 # dictionary storing all identify functions
 IDENTIFY = {
-    #'Dreamcast': identify_dreamcast, # TODO
     'GB':        identify_gb_gbc,
     'GBC':       identify_gb_gbc,
     'GBA':       identify_gba,
