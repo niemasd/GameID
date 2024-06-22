@@ -691,14 +691,10 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         'system_name':    header[magic_word_ind + 0x020 : magic_word_ind + 0x02B],
         'build_date':     header[magic_word_ind + 0x050 : magic_word_ind + 0x058],
         'system_type':    header[magic_word_ind + 0x100 : magic_word_ind + 0x110],
-        'release_date':   header[magic_word_ind + 0x118 : magic_word_ind + 0x120],
         'title_domestic': header[magic_word_ind + 0x120 : magic_word_ind + 0x150],
         'title_overseas': header[magic_word_ind + 0x150 : magic_word_ind + 0x180],
-        'ID':             header[magic_word_ind + 0x180 : magic_word_ind + 0x18D],
-        'device_support': header[magic_word_ind + 0x190 : magic_word_ind + 0x1A0],
-        'region_support': header[magic_word_ind + 0x1F0 : magic_word_ind + 0x1F3],
+        'ID':             header[magic_word_ind + 0x180 : magic_word_ind + 0x190],
     }
-    serial = None # TODO
 
     # try to parse output as strings
     for k in list(out.keys()):
@@ -708,11 +704,78 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
             except:
                 pass
 
+    # fix ID
+    if isinstance(out['ID'], str):
+        parts = [s.strip() for s in out['ID'].strip().split()]
+        if len(parts) == 3:
+            out['disc_kind'], out['ID'], out['version'] = [s.strip('-').strip() for s in parts]
+        elif len(parts) == 2:
+            out['disc_kind'] = parts[0]
+            if parts[1].count('-') == 2:
+                parts = parts[1].split('-')
+                out['ID'] = '-'.join(s.strip() for s in parts[:2])
+                out['version'] = parts[2].strip()
+            else:
+                out['ID'] = parts[1].strip()
+
     # handle build date (MMDDYYYY)
     if isinstance(out['build_date'], str):
         out['build_date'] = '%s-%s-%s' % (out['build_date'][4:8], out['build_date'][0:2], out['build_date'][2:4])
 
+    # release year
+    out['release_year'] = header[magic_word_ind + 0x118 : magic_word_ind + 0x11C]
+    try:
+        out['release_year'] = int(out['release_year'].decode())
+    except:
+        pass
+
+    # release month
+    out['release_month'] = header[magic_word_ind + 0x11D : magic_word_ind + 0x120]
+    try:
+        out['release_month'] = out['release_month'].decode().strip()
+    except:
+        pass
+    if out['release_month'] in MONTH_3LET_TO_FULL:
+        out['release_month'] = MONTH_3LET_TO_FULL[out['release_month']]
+
+    # device support
+    out['device_support'] = header[magic_word_ind + 0x190 : magic_word_ind + 0x1A0]
+    try:
+        tmp = list()
+        for v in out['device_support']:
+            if v < ord('!') or v > ord('~'):
+                continue
+            c = chr(v)
+            if c in GENESIS_DEVICE_SUPPORT:
+                tmp.append(GENESIS_DEVICE_SUPPORT[c])
+            else:
+                tmp.append(c)
+        out['device_support'] = ' / '.join(s for s in sorted(tmp))
+    except:
+        pass
+    if len(out['device_support']) == 0:
+        device_support = None
+
+    # region support
+    out['region_support'] = header[magic_word_ind + 0x1F0 : magic_word_ind + 0x1F3]
+    try:
+        tmp = list()
+        for v in out['region_support']:
+            if v < ord('!') or v > ord('~'):
+                continue
+            c = chr(v)
+            if c in GENESIS_REGION_SUPPORT:
+                tmp.append(GENESIS_REGION_SUPPORT[c])
+            else:
+                tmp.append(c)
+        out['region_support'] = ' / '.join(s for s in sorted(tmp))
+    except:
+        pass
+    if len(out['region_support']) == 0:
+        out['region_support'] = None
+
     # identify game
+    serial = out['ID'].replace('#','').replace('-','').replace(' ','').strip()
     if serial in db['SegaCD']:
         gamedb_entry = db['SegaCD'][serial]
         for k,v in gamedb_entry.items():
