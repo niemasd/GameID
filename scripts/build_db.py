@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     # fix Saturn (delete dashes)
     print("Fixing Saturn database...")
-    db['Saturn'] = {k.replace('-','').replace(' ','').strip():v for k,v in db['Saturn'].items()}
+    db['Saturn'] = {k.strip().split(' ')[0].replace('-','').replace(' ','').strip():v for k,v in db['Saturn'].items()}
 
     # fix SNES: keys = (developer_ID, internal_title, rom_version, checksum) tuples
     print("Fixing SNES database...")

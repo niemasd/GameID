@@ -680,7 +680,7 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
     # set up output dictionary
     out = {
         'manufacturer_ID':     header[magic_word_ind + 0x10 : magic_word_ind + 0x20].decode().strip(),
-        'ID':                  header[magic_word_ind + 0x20 : magic_word_ind + 0x2A].decode().strip(),
+        'ID':                  header[magic_word_ind + 0x20 : magic_word_ind + 0x2A].decode().strip().split(' ')[0].strip(),
         'version':             header[magic_word_ind + 0x2A : magic_word_ind + 0x30].decode().strip(),
         'device_info':         header[magic_word_ind + 0x38 : magic_word_ind + 0x40].decode().strip(),
         'target_area_symbols': header[magic_word_ind + 0x40 : magic_word_ind + 0x50].decode().strip(),
