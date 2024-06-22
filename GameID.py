@@ -686,11 +686,17 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
 
     # set up output dictionary
     out = {
+        'disc_ID':        header[magic_word_ind + 0x000 : magic_word_ind + 0x010],
         'volume_ID':      header[magic_word_ind + 0x010 : magic_word_ind + 0x01B],
         'system_name':    header[magic_word_ind + 0x020 : magic_word_ind + 0x02B],
-        'release_date':   header[magic_word_ind + 0x050 : magic_word_ind + 0x058],
+        'build_date':     header[magic_word_ind + 0x050 : magic_word_ind + 0x058],
+        'system_type':    header[magic_word_ind + 0x100 : magic_word_ind + 0x110],
+        'release_date':   header[magic_word_ind + 0x118 : magic_word_ind + 0x120],
         'title_domestic': header[magic_word_ind + 0x120 : magic_word_ind + 0x150],
         'title_overseas': header[magic_word_ind + 0x150 : magic_word_ind + 0x180],
+        'ID':             header[magic_word_ind + 0x180 : magic_word_ind + 0x18D],
+        'device_support': header[magic_word_ind + 0x190 : magic_word_ind + 0x1A0],
+        'region_support': header[magic_word_ind + 0x1F0 : magic_word_ind + 0x1F3],
     }
     serial = None # TODO
 
@@ -702,9 +708,9 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
             except:
                 pass
 
-    # handle release date
-    if isinstance(out['release_date'], str):
-        out['release_date'] = '%s-%s-%s' % (out['release_date'][4:8], out['release_date'][0:2], out['release_date'][2:4])
+    # handle build date (MMDDYYYY)
+    if isinstance(out['build_date'], str):
+        out['build_date'] = '%s-%s-%s' % (out['build_date'][4:8], out['build_date'][0:2], out['build_date'][2:4])
 
     # identify game
     if serial in db['SegaCD']:
@@ -1054,7 +1060,7 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
         'title_domestic': title_domestic,
         'title_overseas': title_overseas,
         'software_type': software_type,
-        'serial': serial,
+        'ID': serial,
         'revision': revision,
         'checksum': '0x%s' % hex(checksum)[2:].zfill(4),
         'device_support': device_support,
