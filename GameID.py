@@ -671,7 +671,7 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         f = open_file(bins_from_cue(fn)[0], 'rb')
     else:
         f = open_file(fn, mode='rb')
-    header = f.read(0x100); f.close() # 0x100 is arbitrary; too small = won't find SegaCD magic word
+    header = f.read(0x300); f.close() # 0x300 is arbitrary; too small = won't find SegaCD magic word; must be > 0x20F (length of the header)
 
     # search for header starting offset
     magic_word_ind = None
@@ -686,16 +686,25 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
 
     # set up output dictionary
     out = {
-        'volume_ID':   header[magic_word_ind + 0x010 : magic_word_ind + 0x01B].decode().strip(),
-        'system_name': header[magic_word_ind + 0x020 : magic_word_ind + 0x02B].decode().strip(),
-        # TODO CONTINUE: https://github.com/niemasd/GameDB-SegaCD/wiki
+        'volume_ID':      header[magic_word_ind + 0x010 : magic_word_ind + 0x01B],
+        'system_name':    header[magic_word_ind + 0x020 : magic_word_ind + 0x02B],
+        'release_date':   header[magic_word_ind + 0x050 : magic_word_ind + 0x058],
+        'title_domestic': header[magic_word_ind + 0x120 : magic_word_ind + 0x150],
+        'title_overseas': header[magic_word_ind + 0x150 : magic_word_ind + 0x180],
     }
     serial = None # TODO
-    out['internal_title'] = None # TODO
+
+    # try to parse output as strings
+    for k in list(out.keys()):
+        if isinstance(out[k], bytes):
+            try:
+                out[k] = out[k].decode().strip()
+            except:
+                pass
 
     # handle release date
-    mmddyyyy = header[magic_word_ind + 0x50 : magic_word_ind + 0x58].decode().strip()
-    out['release_date'] = '%s-%s-%s' % (mmddyyyy[4:8], mmddyyyy[0:2], mmddyyyy[2:4])
+    if isinstance(out['release_date'], str):
+        out['release_date'] = '%s-%s-%s' % (out['release_date'][4:8], out['release_date'][0:2], out['release_date'][2:4])
 
     # identify game
     if serial in db['SegaCD']:
@@ -704,7 +713,7 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
             if (k not in out) or prefer_gamedb:
                 out[k] = v
     else:
-        out['title'] = out['internal_title'] # 'title' and 'internal_title' will be the same if game not found in GameDB
+        out['title'] = out['title_overseas'] # 'title' and 'title_overseas' will be the same if game not found in GameDB
     return out
 
 # identify Saturn game
@@ -1057,7 +1066,6 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
         'modem_support': modem_support,
         'region_support': region_support,
     }
-    out['title'] = out['title_overseas']
     if isinstance(serial, str):
         gamedb_ID = ''.join(c if c in SAFE else '_' for c in serial).replace('-','')
         if gamedb_ID in db['Genesis']:
@@ -1065,6 +1073,8 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
             for k,v in gamedb_entry.items():
                 if (k not in out) or prefer_gamedb:
                     out[k] = v
+    if 'title' not in out:
+        out['title'] = out['title_overseas'] # default to overseas title if not in GameDB
     return out
 
 # dictionary storing all identify functions
