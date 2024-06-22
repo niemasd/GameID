@@ -684,8 +684,11 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
         'version':             header[magic_word_ind + 0x2A : magic_word_ind + 0x30].decode().strip(),
         'device_info':         header[magic_word_ind + 0x38 : magic_word_ind + 0x40].decode().strip(),
         'target_area_symbols': header[magic_word_ind + 0x40 : magic_word_ind + 0x50].decode().strip(),
-        'internal_title':      header[magic_word_ind + 0x60 : magic_word_ind + 0xD0].decode().strip(),
     }
+    try:
+        out['internal_title'] = header[magic_word_ind + 0x60 : magic_word_ind + 0xD0].decode().strip()
+    except:
+        out['internal_title'] = header[magic_word_ind + 0x60 : magic_word_ind + 0xD0]
     serial = out['ID'].replace('-','').replace(' ','').strip()
 
     # handle release date
@@ -1013,7 +1016,7 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
 
 # dictionary storing all identify functions
 IDENTIFY = {
-    'Dreamcast': identify_dreamcast,
+    #'Dreamcast': identify_dreamcast,
     'GB':        identify_gb_gbc,
     'GBC':       identify_gb_gbc,
     'GBA':       identify_gba,
