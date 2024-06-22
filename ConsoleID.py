@@ -12,7 +12,8 @@ import argparse
 import sys
 
 # non-standard imports
-from GameID import bins_from_cue, check_exists, check_not_exists, DEFAULT_BUFSIZE, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
+from GameID import DEFAULT_BUFSIZE, GC_MAGIC_WORD, SATURN_MAGIC_WORD
+from GameID import bins_from_cue, check_exists, check_not_exists, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
 from pycdlib import PyCdlib
 
 # ConsoleID constants
@@ -50,10 +51,6 @@ CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetype
 }
 EXT2CONSOLE = {ext:console for console in CONSOLE_EXTS for ext in CONSOLE_EXTS[console] if len([c for c,es in CONSOLE_EXTS.items() if ext in es]) == 1}
 ISO9660_EXTS = {'bin', 'cue', 'iso'}
-
-# console-specific constants
-GC_MAGIC_WORD = bytes([0xc2, 0x33, 0x9f, 0x3d])
-SATURN_MAGIC_WORD = 'SEGA SEGASATURN'
 
 # parse user arguments
 def parse_args():
@@ -128,12 +125,16 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
         header = f.read(HEADER_SIZE); f.close()
 
         # check GameCube: https://hitmen.c02.at/files/yagcd/yagcd/chap13.html#sec13
-        if header[0x001C : 0x0020] == GC_MAGIC_WORD:
-            console = 'GC'
+        if console is None:
+            for i in range(0x100): # 0x100 is arbitrary; too big = slow if not a GC game
+                if header[i : i + 4] == GC_MAGIC_WORD:
+                    console = 'GC'; break
 
         # check Saturn
-        elif header[0x0010 : 0x001F].decode() == SATURN_MAGIC_WORD:
-            console = 'Saturn'
+        if console is None:
+            for i in range(0x100): # 0x100 is arbitrary; too big = slow if not a Saturn game
+                if header[i : i + 0xF] == SATURN_MAGIC_WORD:
+                    console = 'Saturn'; break
 
     # next try to identify ISO 9660 game (e.g. PSX, PS2, etc.)
     if console is None and (ext in ISO9660_EXTS or isdir(fn)):

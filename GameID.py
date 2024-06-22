@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.23'
+VERSION = '1.0.24'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -39,6 +39,9 @@ GB_ROM_SIZE_BANKS = {0: (32768, 2), 1: (65536, 4), 2: (131072, 8), 3: (262144, 1
 # GBA constants
 GBA_NINTENDO_LOGO = bytes([0x24, 0xFF, 0xAE, 0x51, 0x69, 0x9A, 0xA2, 0x21, 0x3D, 0x84, 0x82, 0x0A, 0x84, 0xE4, 0x09, 0xAD, 0x11, 0x24, 0x8B, 0x98, 0xC0, 0x81, 0x7F, 0x21, 0xA3, 0x52, 0xBE, 0x19, 0x93, 0x09, 0xCE, 0x20, 0x10, 0x46, 0x4A, 0x4A, 0xF8, 0x27, 0x31, 0xEC, 0x58, 0xC7, 0xE8, 0x33, 0x82, 0xE3, 0xCE, 0xBF, 0x85, 0xF4, 0xDF, 0x94, 0xCE, 0x4B, 0x09, 0xC1, 0x94, 0x56, 0x8A, 0xC0, 0x13, 0x72, 0xA7, 0xFC, 0x9F, 0x84, 0x4D, 0x73, 0xA3, 0xCA, 0x9A, 0x61, 0x58, 0x97, 0xA3, 0x27, 0xFC, 0x03, 0x98, 0x76, 0x23, 0x1D, 0xC7, 0x61, 0x03, 0x04, 0xAE, 0x56, 0xBF, 0x38, 0x84, 0x00, 0x40, 0xA7, 0x0E, 0xFD, 0xFF, 0x52, 0xFE, 0x03, 0x6F, 0x95, 0x30, 0xF1, 0x97, 0xFB, 0xC0, 0x85, 0x60, 0xD6, 0x80, 0x25, 0xA9, 0x63, 0xBE, 0x03, 0x01, 0x4E, 0x38, 0xE2, 0xF9, 0xA2, 0x34, 0xFF, 0xBB, 0x3E, 0x03, 0x44, 0x78, 0x00, 0x90, 0xCB, 0x88, 0x11, 0x3A, 0x94, 0x65, 0xC0, 0x7C, 0x63, 0x87, 0xF0, 0x3C, 0xAF, 0xD6, 0x25, 0xE4, 0x8B, 0x38, 0x0A, 0xAC, 0x72, 0x21, 0xD4, 0xF8, 0x07])
 
+# GC constants
+GC_MAGIC_WORD = bytes([0xc2, 0x33, 0x9f, 0x3d])
+
 # Genesis constants
 GENESIS_DEVICE_SUPPORT = {'J': '3-button Controller', '6': '6-button Controller', '0': 'Master System Controller', 'A': 'Analog Joystick', '4': 'Multitap', 'G': 'Lightgun', 'L': 'Activator', 'M': 'Mouse', 'B': 'Trackball', 'T': 'Tablet', 'V': 'Paddle', 'K': 'Keyboard or Keypad', 'R': 'RS-232', 'P': 'Printer', 'C': 'CD-ROM (Sega CD)', 'F': 'Floppy Drive', 'D': 'Download'}
 GENESIS_REGION_SUPPORT = {'J': 'Japan', 'U': 'Americas', 'E': 'Europe'}
@@ -52,6 +55,7 @@ N64_FIRST_WORD = b'\x80\x37\x12\x40'
 PSX_HEADER = b'\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00'
 
 # Saturn constants
+SATURN_MAGIC_WORD = bytes(ord(c) for c in 'SEGA SEGASATURN')
 SATURN_DEVICE_SUPPORT = {'J': 'Joypad', 'M': 'Mouse', 'G': 'Gun', 'W': 'RAM Cart', 'S': 'Steering Wheel', 'A': 'Virtua Stick or Analog Controller', 'E': 'Analog Controller (3D-pad)', 'T': 'Multi-Tap', 'C': 'Link Cable', 'D': 'Link Cable (Direct Link)', 'X': 'X-Band or Netlink Modem', 'K': 'Keyboard', 'Q': 'Pachinko Controller', 'F': 'Floppy Disk Drive', 'R': 'ROM Cart', 'P': 'Video CD Card (MPEG Movie Card)'}
 
 # SNES constants
@@ -658,28 +662,38 @@ def identify_gc(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False
 
 # identify Saturn game
 def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
-    # parse Saturn ISO header
+    # read Saturn ISO header
     if get_extension(fn) == 'cue':
         f = open_file(bins_from_cue(fn)[0], 'rb')
     else:
         f = open_file(fn, mode='rb')
-    header = f.read(0x00E0); f.close()
+    header = f.read(0x100); f.close() # 0x100 is arbitrary; too small = won't find Saturn magic word
+
+    # search for header starting offset
+    magic_word_ind = None
+    for i in range(len(header) - len(SATURN_MAGIC_WORD) + 1):
+        if header[i : i + len(SATURN_MAGIC_WORD)] == SATURN_MAGIC_WORD:
+            magic_word_ind = i; break
+    if magic_word_ind is None:
+        return None
+
+    # set up output dictionary
     out = {
-        'manufacturer_ID':     header[0x0020 : 0x0030].decode().strip(),
-        'ID':                  header[0x0030 : 0x003A].decode().strip(),
-        'version':             header[0x003A : 0x0040].decode().strip(),
-        'device_info':         header[0x0048 : 0x0050].decode().strip(),
-        'target_area_symbols': header[0x0050 : 0x0060].decode().strip(),
-        'internal_title':      header[0x0070 : 0x00E0].decode().strip(),
+        'manufacturer_ID':     header[magic_word_ind + 0x10 : magic_word_ind + 0x20].decode().strip(),
+        'ID':                  header[magic_word_ind + 0x20 : magic_word_ind + 0x2A].decode().strip(),
+        'version':             header[magic_word_ind + 0x2A : magic_word_ind + 0x30].decode().strip(),
+        'device_info':         header[magic_word_ind + 0x38 : magic_word_ind + 0x40].decode().strip(),
+        'target_area_symbols': header[magic_word_ind + 0x40 : magic_word_ind + 0x50].decode().strip(),
+        'internal_title':      header[magic_word_ind + 0x60 : magic_word_ind + 0xD0].decode().strip(),
     }
     serial = out['ID'].replace('-','').replace(' ','').strip()
 
     # handle release date
-    yyyymmdd = header[0x0040 : 0x0048].decode().strip()
+    yyyymmdd = header[magic_word_ind + 0x30 : magic_word_ind + 0x38].decode().strip()
     out['release_date'] = '%s-%s-%s' % (yyyymmdd[0:4], yyyymmdd[4:6], yyyymmdd[6:8])
 
     # handle device support
-    out['device_support'] = list(header[0x0060 : 0x0070].decode().strip())
+    out['device_support'] = list(header[magic_word_ind + 0x50 : magic_word_ind + 0x60].decode().strip())
     for i in range(len(out['device_support'])):
         if out['device_support'][i] in SATURN_DEVICE_SUPPORT:
             out['device_support'][i] = SATURN_DEVICE_SUPPORT[out['device_support'][i]]
@@ -694,6 +708,17 @@ def identify_saturn(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
     else:
         out['title'] = out['internal_title'] # 'title' and 'internal_title' will be the same if game not found in GameDB
     return out
+
+# identify Dreamcast game
+def identify_dreamcast(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
+    # parse Dreamcast ISO header
+    if get_extension(fn) == 'cue': # TODO CHANGE TO GDI
+        f = open_file(bins_from_cue(fn)[0], 'rb')
+    else:
+        f = open_file(fn, mode='rb')
+    header = f.read(0x00E0); f.close() # TODO CHECK HEADER LENGTH
+    out = { # TODO
+    }
 
 # helper function convert N64 data between little-endian and big-endian
 def n64_convert_endianness(data):
@@ -988,17 +1013,18 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
 
 # dictionary storing all identify functions
 IDENTIFY = {
-    'GB':      identify_gb_gbc,
-    'GBC':     identify_gb_gbc,
-    'GBA':     identify_gba,
-    'GC':      identify_gc,
-    'Genesis': identify_genesis,
-    'N64':     identify_n64,
-    'PSP':     identify_psp,
-    'PSX':     identify_psx,
-    'PS2':     identify_ps2,
-    'Saturn':  identify_saturn,
-    'SNES':    identify_snes,
+    'Dreamcast': identify_dreamcast,
+    'GB':        identify_gb_gbc,
+    'GBC':       identify_gb_gbc,
+    'GBA':       identify_gba,
+    'GC':        identify_gc,
+    'Genesis':   identify_genesis,
+    'N64':       identify_n64,
+    'PSP':       identify_psp,
+    'PSX':       identify_psx,
+    'PS2':       identify_ps2,
+    'Saturn':    identify_saturn,
+    'SNES':      identify_snes,
 }
 
 # throw an error for unsupported consoles
