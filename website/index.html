@@ -149,7 +149,7 @@
 			// gets the IDENTIFY dictionary from the python code
 			const consoleList = gameIDPy.match(/IDENTIFY\s*=\s*\{(\s*\n.*)*\s*\n\}/)[0]
 			// sets the dropdown list of consoles from the IDENTIFY dictionary
-			const consoles = consoleList.match(/['"](.*?)['"]:/g).map(key => key.slice(1, -2)).sort();
+			const consoles = consoleList.match(/['"](.*?)['"]:/g).map(key => key.slice(1, -2)).sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
 			for (const console of consoles) {
 				const option = document.createElement('option');
 				option.value = console;
