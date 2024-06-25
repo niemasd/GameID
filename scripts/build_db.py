@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     # fix SegaCD (delete spaces and dashes)
     print("Fixing SegaCD database...")
-    db['SegaCD'] = {k.strip().split(' ')[0].replace('-','').replace(' ','').strip():v for k,v in db['SegaCD'].items()}
+    db['SegaCD'] = {k.strip().replace('-','').replace(' ','').strip():v for k,v in db['SegaCD'].items()}
 
     # fix SNES: keys = (developer_ID, internal_title, rom_version, checksum) tuples
     print("Fixing SNES database...")
