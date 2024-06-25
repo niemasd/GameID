@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.24'
+VERSION = '1.0.25'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -706,20 +706,6 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
                 out[k] = out[k].decode().strip()
             except:
                 pass
-
-    # fix ID
-    if isinstance(out['ID'], str):
-        parts = [s.strip() for s in out['ID'].strip().split()]
-        if len(parts) == 3:
-            out['disc_kind'], out['ID'], out['version'] = [s.strip('-').strip() for s in parts]
-        elif len(parts) == 2:
-            out['disc_kind'] = parts[0]
-            if parts[1].count('-') == 2:
-                parts = parts[1].split('-')
-                out['ID'] = '-'.join(s.strip() for s in parts[:2])
-                out['version'] = parts[2].strip()
-            else:
-                out['ID'] = parts[1].strip()
 
     # handle build date (MMDDYYYY)
     if isinstance(out['build_date'], str):
