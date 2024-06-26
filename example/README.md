@@ -1,0 +1,1 @@
+This directory contains example files that can be used to test [`GameID.py`](../GameID.py) and [`ConsoleID.py`](../ConsoleID.py). Because we include the 240p Test Suite in our example files, we have added the original 240p Test Suite documentation [here](240pTestSuite_docs) for reference.

@@ -57,6 +57,6 @@ rm -f db.pkl.gz && ./scripts/build_db.py db.pkl.gz
 ## Acknowledgements
 
 * Thanks to [MiSTer Addons](https://misteraddons.com/) for the idea and for help with testing!
-* Thanks to [Artemio Urbina](https://junkerhq.net/) and the other developers of the [240p Test Suite](https://artemiourbina.itch.io/240p-test-suite), which we use as an example file!
+* Thanks to [Artemio Urbina](https://junkerhq.net/) and the other developers of the [240p Test Suite](https://artemiourbina.itch.io/240p-test-suite), which we use as [example files](https://github.com/niemasd/GameID/tree/main/example)!
 * Thanks to [Daniel Ji](https://github.com/daniel-ji) for creating the Pyodide web app!
 * Site favicon by open source project [Twemoji](https://github.com/twitter/twemoji") licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
