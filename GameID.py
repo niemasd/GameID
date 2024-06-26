@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.26'
+VERSION = '1.0.27'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -1080,7 +1080,24 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
 
 # identify Neo Geo CD game
 def identify_neogeocd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
-    pass # TODO
+    # open NeoGeoCD ISO
+    iso = ISO9660(fn); out = dict()
+
+    # prepare output
+    out = {
+        'uuid': iso.get_uuid(),
+        'volume_ID': iso.get_volume_ID(),
+    }
+    out['ID'] = out['volume_ID'] # use disc label as serial for now
+
+    # identify game
+    return out # TODO DELETE AFTER I CREATE GameDB-NeoGeoCD
+    if out['ID'] in db['NeoGeoCD']:
+        gamedb_entry = db['NeoGeoCD'][out['ID']]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    return out
 
 # dictionary storing all identify functions
 IDENTIFY = {

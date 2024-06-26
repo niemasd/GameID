@@ -7,6 +7,7 @@ Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported con
 * `GC` - Nintendo GameCube
 * `Genesis` - Sega Genesis
 * `N64` - Nintendo 64
+* `NeoGeoCD` - SNK Neo Geo CD
 * `PS2` - Sony PlayStation 2
 * `PSP` - Sony PlayStation Portable
 * `PSX` - Sony PlayStation

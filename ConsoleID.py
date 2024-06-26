@@ -82,10 +82,15 @@ def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
         else:
             iso = ISO9660(fn)
             root_files = {tup[0].lstrip('/').rstrip(';1').strip().upper():tup for tup in iso.iter_files(only_root_dir=True)}
+        print(root_files)
 
         # check PSP
         if 'UMD_DATA.BIN' in root_files:
             return 'PSP'
+
+        # check Neo Geo CD
+        elif 'IPL.TXT' in root_files:
+            return 'NeoGeoCD'
 
         # check PSX/PS2
         elif 'SYSTEM.CNF' in root_files:
