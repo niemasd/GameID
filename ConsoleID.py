@@ -82,7 +82,6 @@ def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
         else:
             iso = ISO9660(fn)
             root_files = {tup[0].lstrip('/').rstrip(';1').strip().upper():tup for tup in iso.iter_files(only_root_dir=True)}
-        print(root_files)
 
         # check PSP
         if 'UMD_DATA.BIN' in root_files:
@@ -129,6 +128,15 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
                 if header[i : i + 4] == GC_MAGIC_WORD:
                     console = 'GC'; break
 
+        # check SegaCD (must do before Genesis, as SegaCD games have Genesis magic words too)
+        if console is None:
+            for magic_word in SEGACD_MAGIC_WORDS:
+                for i in range(0x100): # 0x100 is arbitrary; too big = slow if not a SegaCD game
+                    if header[i : i + len(magic_word)] == magic_word:
+                        console = 'SegaCD'; break
+                if console is not None:
+                    break
+
         # check Genesis
         if console is None:
             for magic_word in GENESIS_MAGIC_WORDS:
@@ -143,15 +151,6 @@ def identify(fn, bufsize=DEFAULT_BUFSIZE):
             for i in range(0x100): # 0x100 is arbitrary; too big = slow if not a Saturn game
                 if header[i : i + 0xF] == SATURN_MAGIC_WORD:
                     console = 'Saturn'; break
-
-        # check SegaCD
-        if console is None:
-            for magic_word in SEGACD_MAGIC_WORDS:
-                for i in range(0x100): # 0x100 is arbitrary; too big = slow if not a SegaCD game
-                    if header[i : i + len(magic_word)] == magic_word:
-                        console = 'SegaCD'; break
-                if console is not None:
-                    break
 
     # next try to identify ISO 9660 game (e.g. PSX, PS2, etc.)
     if console is None and (ext in ISO9660_EXTS or isdir(fn)):
