@@ -24,7 +24,8 @@ DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
 FILE_MODES_GZ = {'rb', 'wb', 'rt', 'wt'}
 STRIP_EXT = ['gz'] # list instead of set to iterate in order (just in case)
-ISO966O_UUID_TERMINATION = {ord('$'), ord('.')}
+ISO9660_PVD_MAGIC_WORD = bytes([0x01] + [ord(c) for c in 'CD001'])
+ISO9660_DOT_DIRNAMES = {b'\x00', b'\x01'}
 MONTH_3LET_TO_FULL = {'JAN': 'January', 'FEB': 'February', 'MAR': 'March', 'APR': 'April', 'MAY': 'May', 'JUN': 'June', 'JUL': 'July', 'AUG': 'August', 'SEP': 'September', 'OCT': 'October', 'NOV': 'November', 'DEC': 'December'}
 SAFE = set('-.!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
 
@@ -83,7 +84,7 @@ def getsize(fn):
                 total += getsize(curr)
         return total
     else:
-        with open(fn, 'rb') as f:
+        with open_file(fn, 'rb') as f:
             return f.seek(0, 2)
 
 # print a log message
@@ -157,7 +158,7 @@ def bins_from_cue(fn):
     return bins
 
 # helper class to handle mounted discs / extracted images
-class MOUNTED_DISC:
+class MountedDisc:
     # initialize
     def __init__(self, fn, uuid=None, volume_ID=None, bufsize=DEFAULT_BUFSIZE):
         fn = abspath(expanduser(fn)).rstrip('/')
@@ -186,7 +187,7 @@ class MOUNTED_DISC:
         return self.uuid
 
     # parse filenames as (name, LBA, size) tuples
-    def get_filenames(self, only_root_dir=True):
+    def iter_files(self, only_root_dir=True):
         fns = list(); to_visit = [(self.fn, None, None)]
         while len(to_visit) != 0:
             curr, curr_lba, curr_size = to_visit.pop()
@@ -196,6 +197,11 @@ class MOUNTED_DISC:
                 to_visit += [(fn.strip(), None, None) for fn in glob('%s/*' % curr)]
         fns.sort()
         return fns
+
+    # get data from (path,None,None) tuple
+    def read_file(self, file_tup):
+        with open_file('%s/%s' % (self.fn.rstrip('/'), file_tup[0]), 'rb') as f:
+            return f.read()
 
 # helper class to handle ISO 9660 disc images
 class ISO9660:
@@ -223,14 +229,34 @@ class ISO9660:
             else:
                 error("Invalid disc image block size: %s" % fn)
 
-        # block size 2352 starts at 0x18: https://github.com/cebix/ff7tools/blob/21dd8e29c1f1599d7c776738b1df20f2e9c06de0/ff7/cd.py#L30-L40
-        if self.block_size == 2352:
-            self.block_offset = 0x18
-        else:
-            self.block_offset = 0 # most disc images start at the beginning
+        # load PVD (always starts with 0x01 followed by 'CD0001'): https://wiki.osdev.org/ISO_9660#The_Primary_Volume_Descriptor
+        self.pvd = None; header = self.f.read(1000000) # 1000000 is arbitrary; too large = slow if not valid ISO 9660
+        for i in range(len(header) - len(ISO9660_PVD_MAGIC_WORD) + 1):
+            if header[i : i + len(ISO9660_PVD_MAGIC_WORD)] == ISO9660_PVD_MAGIC_WORD:
+                self.block_offset = i - (16 * self.block_size) # this seems to work regardless of block size or console
+                self.f.seek(i); self.pvd = self.f.read(self.block_size); break
+        if self.pvd is None:
+            error("Invalid ISO9660: %s" % fn)
 
-        # read PVD: https://wiki.osdev.org/ISO_9660#The_Primary_Volume_Descriptor
-        self.f.seek(self.block_offset + (16 * self.block_size)); self.pvd = self.f.read(2048)
+        # load path table: https://wiki.osdev.org/ISO_9660#The_Path_Table
+        path_table_size = unpack('<I', self.pvd[132 : 136])[0]
+        path_table_lba = unpack('<I', self.pvd[140 : 144])[0]
+        self.f.seek(self.block_offset + (path_table_lba * self.block_size))
+        path_table_raw = self.f.read(path_table_size)
+        self.path_table = list(); i = 0
+        while i < len(path_table_raw):
+            curr_dir_name_len = path_table_raw[i]
+            curr_dir_lba = unpack('<I', path_table_raw[i + 2 : i + 6])[0]
+            curr_dir_parent_ind = unpack('<H', path_table_raw[i + 6 : i + 8])[0] - 1 # 1-based indexing --> 0-based
+            curr_dir_name = path_table_raw[i + 8 : i + 8 + curr_dir_name_len]
+            if curr_dir_name == b'\x00':
+                curr_dir_name = ''; curr_dir_parent_ind = None
+            else:
+                curr_dir_name = curr_dir_name.decode()
+            i += (8 + curr_dir_name_len)
+            if (i % 2) == 1:
+                i += 1 # each table entry starts on an even byte number
+            self.path_table.append(('%s/' % curr_dir_name, curr_dir_lba, curr_dir_parent_ind))
 
     # get system ID
     def get_system_ID(self):
@@ -267,11 +293,7 @@ class ISO9660:
     # get UUID (usually YYYY-MM-DD-HH-MM-SS-?? but not always a valid date)
     def get_uuid(self):
         # find UUID (usually offset 813 of PVD, but could be different)
-        uuid_start_ind = 813
-        for i in range(813, 830):
-            if self.pvd[i] in ISO966O_UUID_TERMINATION:
-                uuid_start_ind = i - 16; break
-        uuid = self.pvd[uuid_start_ind : uuid_start_ind + 16]
+        uuid = self.pvd[813 : 829]
 
         # try to parse as text (if it fails, just return the raw bytes)
         try:
@@ -285,46 +307,36 @@ class ISO9660:
             out = out + '-' + uuid[i:i+2]
         return out
 
-    # parse filenames as (name, LBA, size) tuples: https://wiki.osdev.org/ISO_9660#Recursing_from_the_Root_Directory
-    def get_filenames(self, only_root_dir=True):
-        root_dir_lba = unpack('<I', self.pvd[156 +  2 : 156 +  6])[0]
-        root_dir_len = unpack('<I', self.pvd[156 + 10 : 156 + 14])[0]
-        to_explore = [('/', root_dir_lba, root_dir_len)]; files = list()
-        while len(to_explore) != 0:
-            curr_path, curr_lba, curr_len = to_explore.pop()
-            self.f.seek(self.block_offset + (curr_lba * self.block_size))
-            curr_data = self.f.read(curr_len); i = 0
-            while i < len(curr_data):
-                next_len = curr_data[i + 0]
-                if next_len == 0:
+    # iterate over files as as (path, LBA, size) tuples: https://wiki.osdev.org/ISO_9660#Recursing_from_the_Root_Directory
+    def iter_files(self, only_root_dir=True):
+        # handle each directory one-by-one
+        for dir_name, dir_lba, dir_parent_ind in self.path_table:
+            # get full path of current directory
+            dir_path = dir_name; tmp_ind = dir_parent_ind
+            while tmp_ind is not None:
+                dir_path = '%s%s' % (self.path_table[tmp_ind][0], dir_path); tmp_ind = self.path_table[tmp_ind][2]
+
+            # parse directory: https://wiki.osdev.org/ISO_9660#Directories
+            self.f.seek(self.block_offset + (self.block_size * dir_lba))
+            while True:
+                curr_len = self.f.read(1)[0]
+                if curr_len == 0:
                     break
-                next_ext_attr_rec_len = curr_data[i + 1]
-                next_lba = unpack('<I', curr_data[i + 2 : i + 6])[0]
-                next_data_len = unpack('<I', curr_data[i + 10 : i + 14])[0]
-                next_rec_date_time = curr_data[i + 18 : i + 25]
-                next_file_flags = curr_data[i + 25]
-                next_file_unit_size = curr_data[i + 26]
-                next_interleave_gap_size = curr_data[i + 27]
-                next_vol_seq_num = unpack('<H', curr_data[i + 28 : i + 30])[0]
-                next_name_len = curr_data[i + 32]
-                next_name = curr_data[i + 33 : i + 33 + next_name_len]
-                if next_name not in {b'\x00', b'\x01'}:
-                    try:
-                        next_name = next_name.decode()
-                        if next_name.endswith(';1'):
-                            next_path = '%s%s' % (curr_path, next_name[:-2])
-                        else:
-                            next_path = '%s%s/' % (curr_path, next_name)
-                        next_tup = (next_path, next_lba, next_len)
-                        if not next_path.endswith('/'):
-                            files.append(next_tup)
-                        elif not only_root_dir:
-                            #to_explore.append(next_tup) # doesn't work
-                            raise NotImplementedError("Currently only supports root directory")
-                    except:
-                        pass # skip trying to load filename that's not a valid string
-                i += next_len
-        return files
+                curr_raw = self.f.read(curr_len-1) # already read first byte (curr_len); all indices below are off-by-one as a result
+                curr_flags = curr_raw[24]
+                if (curr_flags & 0b00000010) != 0:
+                    continue # directory, so I'll handle it in the outer for-loop over the path table
+                curr_lba = unpack('<I', curr_raw[1 : 5])[0]
+                curr_len = unpack('<I', curr_raw[9 : 13])[0]
+                curr_fn_len = curr_raw[31]
+                curr_path = '%s%s' % (dir_path, curr_raw[32 : 32 + curr_fn_len].decode())
+                if (not only_root_dir) or (curr_path.count('/') == 1):
+                    yield (curr_path, curr_lba, curr_len)
+
+    # read the data of a given file (path, LBA, size) tuple
+    def read_file(self, file_tup):
+        path, lba, size = file_tup; self.f.seek(self.block_offset + (self.block_size * lba))
+        return self.f.read(size)
 
 # helper class to serve as a file pointer for pycdlib (to support GZIP, weird PSX discs, etc.)
 class ISO9660FP:
@@ -432,15 +444,35 @@ def identify_psp(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=Fals
         from pycdlib import PyCdlib
     except:
         error("Unable to import pycdlib. Install with: pip install pycdlib")
-    iso = PyCdlib(); iso.open_fp(ISO9660FP(fn,'rb')); data = BytesIO(); iso.get_file_from_iso_fp(data, iso_path='/UMD_DATA.BIN')
+    iso = ISO9660(fn); data = None
+    for file_tup in iso.iter_files():
+        if file_tup[0].upper() == '/UMD_DATA.BIN':
+            data = iso.read_file(file_tup)
+    if data is None:
+        error("Invalid PSP ISO: %s" % fn)
 
     # read serial
     serial = ""
-    for v in data.getvalue():
+    for v in data:
         if v == ord('|'):
             break
         serial += chr(v)
     serial = serial.strip()
+
+    # prepare output
+    out = {
+        'ID': serial,
+        'uuid': iso.get_uuid(),
+        'volume_ID': iso.get_volume_ID(),
+    }
+
+    # identify game
+    if serial in db['PSP']:
+        gamedb_entry = db['PSP'][serial]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    return out
 
     # identify game
     if serial in db['PSP']:
@@ -452,13 +484,16 @@ def identify_psx_ps2(fn, db, console, user_uuid=None, user_volume_ID=None, prefe
     if isfile(fn) or fn.lower().startswith('/dev/'):
         iso = ISO9660(fn)
     elif isdir(fn):
-        iso = MOUNTED_DISC(fn, uuid=user_uuid, volume_ID=user_volume_ID)
+        iso = MountedDisc(fn, uuid=user_uuid, volume_ID=user_volume_ID)
     else:
         error("File/folder not found: %s" % fn)
     out = None; serial = None
 
     # try to find file in root directory with name SXXX_XXX.XX
-    root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len in iso.get_filenames(only_root_dir=True)]
+    root_fns = [root_fn.lstrip('/') for root_fn, file_lba, file_len in iso.iter_files(only_root_dir=True)]
+    for i in range(len(root_fns)):
+        if ';' in root_fns[i]:
+            root_fns[i] = root_fns[i].split(';')[0]
     root_fns_upper = [s.strip().upper() for s in root_fns]
     for prefix in db['GAMEID'][console]['ID_PREFIXES']:
         for root_fn in root_fns_upper:
@@ -1051,6 +1086,10 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
         out['title'] = out['title_overseas'] # default to overseas title if not in GameDB
     return out
 
+# identify Neo Geo CD game
+def identify_neogeocd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
+    pass # TODO
+
 # dictionary storing all identify functions
 IDENTIFY = {
     'GB':        identify_gb_gbc,
@@ -1059,6 +1098,7 @@ IDENTIFY = {
     'GC':        identify_gc,
     'Genesis':   identify_genesis,
     'N64':       identify_n64,
+    'NeoGeoCD':  identify_neogeocd,
     'PSP':       identify_psp,
     'PSX':       identify_psx,
     'PS2':       identify_ps2,
