@@ -1110,12 +1110,15 @@ def identify_neogeocd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb
         'uuid': iso.get_uuid(),
         'volume_ID': iso.get_volume_ID(),
     }
-    out['ID'] = out['volume_ID'] # use disc label as serial for now
+    serial = (out['uuid'], out['volume_ID'])
 
     # identify game
-    return out # TODO DELETE AFTER I CREATE GameDB-NeoGeoCD
-    if out['ID'] in db['NeoGeoCD']:
-        gamedb_entry = db['NeoGeoCD'][out['ID']]
+    gamedb_entry = None
+    if serial in db['NeoGeoCD']:
+        gamedb_entry = db['NeoGeoCD'][serial]
+    elif out['volume_ID'] in db['NeoGeoCD']:
+        gamedb_entry = db['NeoGeoCD'][out['volume_ID']]
+    if gamedb_entry is not None:
         for k,v in gamedb_entry.items():
             if (k not in out) or prefer_gamedb:
                 out[k] = v

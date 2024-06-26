@@ -11,7 +11,7 @@ from sys import argv
 from urllib.request import urlopen
 
 # constants
-CONSOLES = {'GB', 'GBA', 'GBC', 'GC', 'Genesis', 'N64', 'PSP', 'PSX', 'PS2', 'Saturn', 'SegaCD', 'SNES'}
+CONSOLES = {'GB', 'GBA', 'GBC', 'GC', 'Genesis', 'N64', 'NeoGeoCD', 'PSP', 'PSX', 'PS2', 'Saturn', 'SegaCD', 'SNES'}
 
 # get GameDB URL
 def get_url(console):
@@ -67,6 +67,10 @@ if __name__ == "__main__":
     # fix N64 (only keep last 3 letters of middle part of NUS-NXXX-XXX serial)
     print("Fixing N64 database...")
     db['N64'] = {k.split('-')[1][1:]:v for k,v in db['N64'].items()}
+
+    # fix Neo Geo CD: ID based on (UUID, disc label) tuples, with just disc label as a last resort
+    print("Fixing NeoGeoCD database...")
+    db['NeoGeoCD'] = {new_k:v for k,v in db['NeoGeoCD'].items() for new_k in [(v['uuid'],v['volume_ID']), v['volume_ID']] if new_k is not None}
 
     # fix PSX and PS2
     for console in ['PSX', 'PS2']:
