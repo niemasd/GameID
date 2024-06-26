@@ -171,11 +171,6 @@
 		async function loadPyodideAndPythonFiles() {
 			const pyodide = await loadPyodide();
 
-			// install dependencies
-			await pyodide.loadPackage('micropip');
-			const micropip = pyodide.pyimport('micropip');
-			await micropip.install('assets/pycdlib-1.14.0-py2.py3-none-any.whl');
-
 			// write database to Pyodide FS
 			pyodide.FS.writeFile(PYODIDE_ROOT + 'db.pkl.gz', new Uint8Array(await (await fetch('assets/db.pkl.gz')).arrayBuffer()));
 

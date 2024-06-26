@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.25'
+VERSION = '1.0.26'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -338,7 +338,7 @@ class ISO9660:
         path, lba, size = file_tup; self.f.seek(self.block_offset + (self.block_size * lba))
         return self.f.read(size)
 
-# helper class to serve as a file pointer for pycdlib (to support GZIP, weird PSX discs, etc.)
+# helper class to serve as a file pointer (to support GZIP, weird PSX discs, etc.)
 class ISO9660FP:
     # constructor
     def __init__(self, fn, mode='rb', start_offset=0, bufsize=DEFAULT_BUFSIZE):
@@ -440,10 +440,6 @@ def load_db(fn, internet_timeout=DEFAULT_INTERNET_TIMEOUT, bufsize=DEFAULT_BUFSI
 # identify PSP game
 def identify_psp(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # open PSP ISO
-    try:
-        from pycdlib import PyCdlib
-    except:
-        error("Unable to import pycdlib. Install with: pip install pycdlib")
     iso = ISO9660(fn); data = None
     for file_tup in iso.iter_files():
         if file_tup[0].upper() == '/UMD_DATA.BIN':

@@ -14,7 +14,6 @@ import sys
 # non-standard imports
 from GameID import DEFAULT_BUFSIZE, GC_MAGIC_WORD, GENESIS_MAGIC_WORDS, SATURN_MAGIC_WORD, SEGACD_MAGIC_WORDS
 from GameID import bins_from_cue, check_exists, check_not_exists, error, get_extension, getsize, ISO9660, ISO9660FP, open_file
-from pycdlib import PyCdlib
 
 # ConsoleID constants
 MAX_SIZE_CD = 734003200 # 700 MiB
@@ -81,12 +80,8 @@ def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
 
         # if image, get root files from ISO 9660
         else:
-            try: # try to use pycdlib
-                iso = PyCdlib(); iso_fp = ISO9660FP(fn, 'rb'); iso.open_fp(iso_fp)
-                root_files = {f.file_identifier().decode().lstrip('/').rstrip(';1').strip().upper():f for f in iso.list_children(iso_path='/')}
-            except: # use my ISO9660 implementation if pycdlib fails
-                iso = ISO9660(fn)
-                root_files = {tup[0].lstrip('/').rstrip(';1').strip().upper():tup for tup in iso.get_filenames(only_root_dir=True)}
+            iso = ISO9660(fn)
+            root_files = {tup[0].lstrip('/').rstrip(';1').strip().upper():tup for tup in iso.iter_files(only_root_dir=True)}
 
         # check PSP
         if 'UMD_DATA.BIN' in root_files:
@@ -97,12 +92,7 @@ def identify_disc(fn, bufsize=DEFAULT_BUFSIZE):
             if isinstance(root_files['SYSTEM.CNF'], str): # directory
                 system_cnf = open(root_files['SYSTEM.CNF'], 'rb').read().decode()
             elif isinstance(root_files['SYSTEM.CNF'], tuple): # my ISO9660 implementation
-                tmp_fn, tmp_lba, tmp_size = root_files['SYSTEM.CNF']
-                f = open(iso.bins[0],'rb'); f.seek((tmp_lba * iso.block_size) + 24)
-                system_cnf = f.read(tmp_size).decode(); f.close()
-            else: # PyCdlib
-                iso_fp.seek(root_files['SYSTEM.CNF'].fp_offset)
-                system_cnf = iso_fp.read(root_files['SYSTEM.CNF'].get_data_length()).decode()
+                system_cnf = iso.read_file(root_files['SYSTEM.CNF']).decode()
             if 'BOOT2' in system_cnf:
                 return 'PS2'
             elif 'BOOT' in system_cnf:
