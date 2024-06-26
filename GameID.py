@@ -18,7 +18,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.27'
+VERSION = '1.0.28'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -715,6 +715,7 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
     else:
         f = open_file(fn, mode='rb')
     header = f.read(0x300); f.close() # 0x300 is arbitrary; too small = won't find SegaCD magic word; must be > 0x20F (length of the header)
+    iso = ISO9660(fn)
 
     # search for header starting offset
     magic_word_ind = None
@@ -729,17 +730,19 @@ def identify_segacd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=F
 
     # set up output dictionary
     out = {
-        'disc_ID':        header[magic_word_ind + 0x000 : magic_word_ind + 0x010],
-        'volume_ID':      header[magic_word_ind + 0x010 : magic_word_ind + 0x01B],
-        'system_name':    header[magic_word_ind + 0x020 : magic_word_ind + 0x02B],
-        'build_date':     header[magic_word_ind + 0x050 : magic_word_ind + 0x058],
-        'system_type':    header[magic_word_ind + 0x100 : magic_word_ind + 0x110],
-        'release_year':   header[magic_word_ind + 0x118 : magic_word_ind + 0x11C],
-        'release_month':  header[magic_word_ind + 0x11D : magic_word_ind + 0x120],
-        'title_domestic': header[magic_word_ind + 0x120 : magic_word_ind + 0x150],
-        'title_overseas': header[magic_word_ind + 0x150 : magic_word_ind + 0x180],
-        'ID':             header[magic_word_ind + 0x180 : magic_word_ind + 0x190],
-        'device_support': header[magic_word_ind + 0x190 : magic_word_ind + 0x1A0],
+        'disc_ID':          header[magic_word_ind + 0x000 : magic_word_ind + 0x010],
+        'disc_volume_name': header[magic_word_ind + 0x010 : magic_word_ind + 0x01B],
+        'system_name':      header[magic_word_ind + 0x020 : magic_word_ind + 0x02B],
+        'build_date':       header[magic_word_ind + 0x050 : magic_word_ind + 0x058],
+        'system_type':      header[magic_word_ind + 0x100 : magic_word_ind + 0x110],
+        'release_year':     header[magic_word_ind + 0x118 : magic_word_ind + 0x11C],
+        'release_month':    header[magic_word_ind + 0x11D : magic_word_ind + 0x120],
+        'title_domestic':   header[magic_word_ind + 0x120 : magic_word_ind + 0x150],
+        'title_overseas':   header[magic_word_ind + 0x150 : magic_word_ind + 0x180],
+        'ID':               header[magic_word_ind + 0x180 : magic_word_ind + 0x190],
+        'device_support':   header[magic_word_ind + 0x190 : magic_word_ind + 0x1A0],
+        'uuid':             iso.get_uuid(),
+        'volume_ID':        iso.get_volume_ID(),
     }
 
     # try to parse output as strings
