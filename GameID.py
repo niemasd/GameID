@@ -216,7 +216,7 @@ class ISO9660:
                 error()
             else:
                 error("%s files are not yet supported" % (fn.split('.')[-1].strip().lower()))
-        self.fn = abspath(expanduser(fn)); self.size = getsize(fn)
+        self.fn = abspath(expanduser(fn))
         if fn.lower().endswith('.cue'):
             self.bins = bins_from_cue(fn)
             self.sizes = [getsize(b) for b in self.bins]
@@ -224,6 +224,8 @@ class ISO9660:
             self.f = ISO9660FP(self.bins[0])
         else:
             self.f = ISO9660FP(self.fn)
+            self.sizes = [getsize(self.fn)]
+            self.size = self.sizes[0]
 
         # determine block size from just first track
         if (self.sizes[0] % 2352) == 0:
@@ -382,8 +384,8 @@ def get_args_interactive(argv):
 
     # get console (--console)
     while arg_console is None:
-        print_log("Enter console (options: %s): " % ', '.join(sorted(IDENTIFY.keys())), end='')
-        arg_console = input().replace('"','').replace("'",'').strip()
+        print_log("Enter console (options: %s): " % ', '.join(GAMEID_CONSOLES), end='')
+        arg_console = input().replace('"','').replace("'",'').strip().upper()
         if arg_console not in IDENTIFY:
             print_log("ERROR: Invalid console: %s\n" % arg_console); arg_console = None
     argv += ['--console', arg_console]
@@ -397,7 +399,7 @@ def parse_args():
     # run argparse
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-i', '--input', required=True, type=str, help="Input Game File")
-    parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(sorted(IDENTIFY.keys())))
+    parser.add_argument('-c', '--console', required=True, type=str, help="Console (options: %s)" % ', '.join(GAMEID_CONSOLES))
     parser.add_argument('-d', '--database', required=False, type=str, default=None, help="GameID Database (db.pkl.gz)")
     parser.add_argument('-o', '--output', required=False, type=str, default='stdout', help="Output File")
     parser.add_argument('--disc_uuid', required=False, type=str, default=None, help="Disc UUID (if already known)")
@@ -408,6 +410,7 @@ def parse_args():
     args = parser.parse_args()
 
     # check console
+    args.console = args.console.strip().upper()
     check_console(args.console)
 
     # check input game file
@@ -1134,11 +1137,13 @@ IDENTIFY = {
     'SegaCD':    identify_segacd,
     'SNES':      identify_snes,
 }
+GAMEID_CONSOLES = sorted(IDENTIFY.keys())
+IDENTIFY = {k.upper():v for k,v in IDENTIFY.items()} # upper-case for case-insensitivity
 
 # throw an error for unsupported consoles
 def check_console(console):
-    if console not in IDENTIFY:
-        error("Invalid console: %s\nOptions: %s" % (console, ', '.join(sorted(IDENTIFY.keys()))))
+    if console.upper() not in IDENTIFY:
+        error("Invalid console: %s\nOptions: %s" % (console, ', '.join(GAMEID_CONSOLES)))
 
 # main program logic
 def main():
