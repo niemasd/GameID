@@ -219,13 +219,16 @@ class ISO9660:
         self.fn = abspath(expanduser(fn)); self.size = getsize(fn)
         if fn.lower().endswith('.cue'):
             self.bins = bins_from_cue(fn)
-            self.size = sum(getsize(b) for b in self.bins)
+            self.sizes = [getsize(b) for b in self.bins]
+            self.size = sum(self.sizes)
             self.f = ISO9660FP(self.bins[0])
         else:
             self.f = ISO9660FP(self.fn)
-        if (self.size % 2352) == 0:
+
+        # determine block size from just first track
+        if (self.sizes[0] % 2352) == 0:
             self.block_size = 2352
-        elif (self.size % 2048) == 0:
+        elif (self.sizes[0] % 2048) == 0:
             self.block_size = 2048
         else:
             if quiet:
