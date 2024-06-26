@@ -33,8 +33,8 @@ CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetype
     'N64':       {'n64', 'ndd', 'v64', 'z64'},                # Nintendo 64
     'NDS':       {'app', 'dsi', 'ids', 'nds', 'srl'},         # Nintendo DS
     'NES':       {'fds', 'nes', 'nez', 'unf', 'unif'},        # Nintendo Entertainment System
-    'NGP':       {'ngp'},                                     # Neo Geo Pocket
-    'NGPC':      {'ngpc'},                                    # Neo Geo Pocket Color
+    'NGP':       {'ngp'},                                     # SNK Neo Geo Pocket
+    'NGPC':      {'ngpc'},                                    # SNK Neo Geo Pocket Color
     'PCE':       {'pce'},                                     # PC Engine
     'PS2':       {'bin', 'chd', 'cso', 'cue', 'iso'},         # Sony PlayStation 2
     'PSP':       {'cso', 'iso'},                              # Sony PlayStation Portable
