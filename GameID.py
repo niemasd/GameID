@@ -164,7 +164,11 @@ class MountedDisc:
         fn = abspath(expanduser(fn)).rstrip('/')
         if not isdir(fn):
             error("Input must be a directory: %s" % fn)
-        self.fn = fn; self.uuid = uuid; self.volume_ID = volume_ID
+        self.fn = fn; self.uuid = uuid
+        if volume_ID is None:
+            self.volume_ID = fn.split('/')[-1].strip()
+        else:
+            self.volume_ID = volume_ID
 
     # get system ID
     def get_system_ID(self):
@@ -188,15 +192,15 @@ class MountedDisc:
 
     # parse filenames as (name, LBA, size) tuples
     def iter_files(self, only_root_dir=True):
-        fns = list(); to_visit = [(self.fn, None, None)]
+        fns = list(); to_visit = [self.fn]
         while len(to_visit) != 0:
-            curr, curr_lba, curr_size = to_visit.pop()
+            curr = to_visit.pop()
             if isfile(curr):
-                fns.append((curr.strip()[len(self.fn)+1:].strip(), curr_lba, curr_size))
+                fns.append(curr.strip()[len(self.fn)+1:].strip())
             elif isdir(curr) and (curr == self.fn or (not only_root_dir)):
-                to_visit += [(fn.strip(), None, None) for fn in glob('%s/*' % curr)]
+                to_visit += [fn.strip() for fn in glob('%s/*' % curr)]
         fns.sort()
-        return fns
+        return [('/%s' % fn, None, getsize('%s/%s' % (self.fn,fn))) for fn in fns] # add '/' to left to be consistent with ISO9660
 
     # get data from (path,None,None) tuple
     def read_file(self, file_tup):
@@ -439,8 +443,14 @@ def load_db(fn, internet_timeout=DEFAULT_INTERNET_TIMEOUT, bufsize=DEFAULT_BUFSI
 
 # identify PSP game
 def identify_psp(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
-    # open PSP ISO
-    iso = ISO9660(fn); data = None
+    # set things up
+    if isfile(fn) or fn.lower().startswith('/dev/'):
+        iso = ISO9660(fn)
+    elif isdir(fn):
+        iso = MountedDisc(fn, uuid=user_uuid, volume_ID=user_volume_ID)
+    else:
+        error("File/folder not found: %s" % fn)
+    data = None
     for file_tup in iso.iter_files():
         if file_tup[0].upper() == '/UMD_DATA.BIN':
             data = iso.read_file(file_tup)
@@ -1080,8 +1090,14 @@ def identify_genesis(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=
 
 # identify Neo Geo CD game
 def identify_neogeocd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
-    # open NeoGeoCD ISO
-    iso = ISO9660(fn); out = dict()
+    # set things up
+    if isfile(fn) or fn.lower().startswith('/dev/'):
+        iso = ISO9660(fn)
+    elif isdir(fn):
+        iso = MountedDisc(fn, uuid=user_uuid, volume_ID=user_volume_ID)
+    else:
+        error("File/folder not found: %s" % fn)
+    out = dict()
 
     # prepare output
     out = {
