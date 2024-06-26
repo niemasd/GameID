@@ -42,7 +42,7 @@ jobs:
           cp ../ConsoleID.py ./assets/ && \
           cp ../README.md ./assets/ && \
           cp ../db.pkl.gz ./assets/ && \
-          cp ../example/GC/GameCube-240pSuite-1.17.iso ./assets/ 
+          cp ../example/GC/GameCube-240pSuite-1.17.iso.gz ./assets/ 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
