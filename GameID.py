@@ -470,10 +470,6 @@ def identify_psp(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=Fals
                 out[k] = v
     return out
 
-    # identify game
-    if serial in db['PSP']:
-        return db['PSP'][serial]
-
 # identify PSX/PS2 game
 def identify_psx_ps2(fn, db, console, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # set things up
