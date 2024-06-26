@@ -19,6 +19,7 @@ from GameID import bins_from_cue, check_exists, check_not_exists, error, get_ext
 MAX_SIZE_CD = 734003200 # 700 MiB
 HEADER_SIZE = 1000000 # how many bytes to read when attempting to manually detect game from raw data
 CONSOLE_EXTS = { # https://emulation.gametechwiki.com/index.php/List_of_filetypes
+    '32X':       {'32x'},                                     # Sega 32X
     '3DS':       {'3ds', 'cia'},                              # Nintendo 3DS
     'Amiga':     {'adf', 'adz', 'dms', 'ipf'},                # Amiga
     'Android':   {'apk', 'obb'},                              # Android
