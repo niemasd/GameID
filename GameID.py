@@ -19,7 +19,7 @@ import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.29'
+VERSION = '1.0.30'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -898,18 +898,20 @@ def identify_n64(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=Fals
         serial = '%s%s%s' % (chr(cartridge_ID[0]), chr(cartridge_ID[1]), chr(country_code))
     except:
         error("Invalid N64 ROM (%s %s): %s" % (cartridge_ID, country_code, fn))
+    out = {
+        'ID': serial,
+    }
+    internal_name = header[0x20 : 0x34]
+    try:
+        out['internal_name'] = internal_name.decode().strip()
+    except:
+        out['internal_name'] = internal_name
     if serial in db['N64']:
-        out = db['N64'][serial]
-        out['ID'] = serial
-        if not prefer_gamedb:
-            internal_name = header[0x20 : 0x34]
-            try:
-                out['title'] = internal_name.decode().strip()
-            except:
-                out['title'] = internal_name
-        f.close()
-        return out
-    f.close(); error("N64 game not found (%s %s): %s" % (cartridge_ID, country_code, fn))
+        gamedb_entry = db['N64'][serial]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    return out
 
 # identify NES game
 def identify_nes(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
