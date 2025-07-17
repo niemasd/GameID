@@ -14,11 +14,12 @@ from pickle import loads as ploads
 from struct import unpack
 from sys import stderr
 from zipfile import ZipFile
+from zlib import crc32
 import sys
 import argparse
 
 # GameID constants
-VERSION = '1.0.28'
+VERSION = '1.0.29'
 DB_URL = 'https://github.com/niemasd/GameID/raw/main/db.pkl.gz'
 DEFAULT_INTERNET_TIMEOUT = 1 # seconds
 DEFAULT_BUFSIZE = 1000000
@@ -910,6 +911,23 @@ def identify_n64(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=Fals
         return out
     f.close(); error("N64 game not found (%s %s): %s" % (cartridge_ID, country_code, fn))
 
+# identify NES game
+def identify_nes(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
+    # load ROM and calculate CRC32
+    f = open_file(fn, mode='rb'); data = f.read(); f.close()
+    checksum = crc32(data)
+
+    # identify game
+    out = {
+        'crc32': hex(checksum)[2:].zfill(8),
+    }
+    if checksum in db['NES']:
+        gamedb_entry = db['NES'][checksum]
+        for k,v in gamedb_entry.items():
+            if (k not in out) or prefer_gamedb:
+                out[k] = v
+    return out
+
 # identify SNES game
 def identify_snes(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
     # load ROM and remove optional 512-byte header: https://snes.nesdev.org/wiki/ROM_file_formats#Detecting_Headered_ROM
@@ -1136,6 +1154,7 @@ IDENTIFY = {
     'Genesis':   identify_genesis,
     'N64':       identify_n64,
     'NeoGeoCD':  identify_neogeocd,
+    'NES':       identify_nes,
     'PSP':       identify_psp,
     'PSX':       identify_psx,
     'PS2':       identify_ps2,
