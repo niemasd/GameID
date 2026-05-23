@@ -8,8 +8,9 @@ from datetime import datetime
 from glob import glob
 from gzip import decompress as gdecompress
 from gzip import open as gopen
+from hashlib import sha1
 from io import BytesIO
-from os.path import abspath, expanduser, isdir, isfile
+from os.path import abspath, dirname, expanduser, isdir, isfile, join as pathjoin
 from pickle import loads as ploads
 from struct import unpack
 from sys import stderr
@@ -63,6 +64,12 @@ SATURN_TARGET_AREAS = {'J': 'Japan', 'T': 'Asia NTSC (Taiwan, Philippines)', 'U'
 
 # SegaCD constants
 SEGACD_MAGIC_WORDS = [bytes(ord(c) for c in w) for w in ['SEGADISCSYSTEM', 'SEGABOOTDISC', 'SEGADISC', 'SEGADATADISC']]
+
+# PC Engine CD constants
+PCECD_SECTOR_SIZE = 2352
+PCECD_MODE1_PAYLOAD_OFFSET = 16
+PCECD_MODE1_PAYLOAD_SIZE = 2048
+PCECD_BOOT_SECTORS = 96
 
 # SNES constants
 SNES_LOROM_HEADER_START = 0x7FC0
@@ -157,6 +164,124 @@ def bins_from_cue(fn):
     bins = ['%s/%s' % ('/'.join(abspath(expanduser(fn)).split('/')[:-1]), l.split('"')[1].strip()) for l in f_cue if l.strip().lower().startswith('file')]
     f_cue.close()
     return bins
+
+# convert CUE MM:SS:FF time to CD frames/sectors
+def cue_time_to_frames(t):
+    parts = [int(p) for p in t.strip().split(':')]
+    if len(parts) != 3:
+        error("Invalid CUE time: %s" % t)
+    return ((parts[0] * 60) + parts[1]) * 75 + parts[2]
+
+# parse CUE track layout
+def parse_cue(fn):
+    if get_extension(fn) != 'cue':
+        error("Not a CUE file: %s" % fn)
+    tracks = []
+    current_file = None
+    current_track = None
+    with open_file(fn, 'rt') as f_cue:
+        for line in f_cue:
+            s = line.strip()
+            lower = s.lower()
+            if lower.startswith('file '):
+                try:
+                    current_file = s.split('"')[1].strip()
+                except:
+                    error("Unsupported CUE FILE line: %s" % s)
+            elif lower.startswith('track '):
+                parts = s.split()
+                current_track = {
+                    'no': int(parts[1]),
+                    'mode': parts[2].upper(),
+                    'file': current_file,
+                    'index00': None,
+                    'index01': None,
+                    'pregap': None,
+                }
+                tracks.append(current_track)
+            elif current_track is not None and lower.startswith('index 00 '):
+                current_track['index00'] = cue_time_to_frames(s.split()[-1])
+            elif current_track is not None and lower.startswith('index 01 '):
+                current_track['index01'] = cue_time_to_frames(s.split()[-1])
+            elif current_track is not None and lower.startswith('pregap '):
+                current_track['pregap'] = cue_time_to_frames(s.split()[-1])
+    return tracks
+
+# canonicalize PCE-CD CUE TOC the same way GameDB's PCE-CD builder does
+def pcecd_canonical_toc(fn, tracks, image_size, lengths):
+    cue_dir = dirname(abspath(expanduser(fn)))
+    file_ordinals = {}
+    for track in tracks:
+        file_name = track.get('file')
+        if file_name and file_name not in file_ordinals:
+            file_ordinals[file_name] = len(file_ordinals) + 1
+    parts = ['image_size=%d' % image_size]
+    for track, length in zip(tracks, lengths):
+        file_ordinal = ''
+        file_size = ''
+        if track.get('file'):
+            file_ordinal = str(file_ordinals[track['file']])
+            file_size = str(getsize(pathjoin(cue_dir, track['file'])))
+        parts.append(':'.join([
+            str(track['no']),
+            track['mode'],
+            file_ordinal,
+            file_size,
+            str(track['index00']) if track['index00'] is not None else '',
+            str(track['index01']) if track['index01'] is not None else '',
+            str(track['pregap']) if track['pregap'] is not None else '',
+            str(length),
+        ]))
+    return '|'.join(parts)
+
+# compute PCE-CD TOC SHA1 and boot96 SHA1 from CUE/BIN image
+def pcecd_hashes_from_cue(fn):
+    cue_dir = dirname(abspath(expanduser(fn)))
+    tracks = parse_cue(fn)
+    image_names = list(dict.fromkeys([t['file'] for t in tracks if t.get('file')]))
+    if len(image_names) == 0:
+        error("CUE has no FILE entries: %s" % fn)
+    for image_name in image_names:
+        image_path = pathjoin(cue_dir, image_name)
+        if not isfile(image_path):
+            error("Missing CUE image file: %s" % image_path)
+
+    image_size = sum(getsize(pathjoin(cue_dir, image_name)) for image_name in image_names)
+    if len(image_names) == 1:
+        image_sectors = image_size // PCECD_SECTOR_SIZE
+        lengths = []
+        for i, track in enumerate(tracks):
+            start = track['index01']
+            if start is None:
+                lengths.append(0)
+                continue
+            next_start = image_sectors
+            for next_track in tracks[i+1:]:
+                if next_track['index01'] is not None:
+                    next_start = next_track['index01']
+                    break
+            lengths.append(max(0, next_start - start))
+    else:
+        lengths = [getsize(pathjoin(cue_dir, track['file'])) // PCECD_SECTOR_SIZE if track.get('file') else 0 for track in tracks]
+
+    toc_text = pcecd_canonical_toc(fn, tracks, image_size, lengths)
+    toc_sha1 = sha1(toc_text.encode()).hexdigest()
+
+    boot_payload = bytearray()
+    data_tracks = [t for t in tracks if t['mode'].startswith('MODE')]
+    if len(data_tracks) == 0:
+        error("No data track found in PCE-CD CUE: %s" % fn)
+    data_track = data_tracks[0]
+    data_path = pathjoin(cue_dir, data_track['file'])
+    with open_file(data_path, 'rb') as f:
+        f.seek(data_track['index01'] * PCECD_SECTOR_SIZE)
+        raw = f.read(PCECD_BOOT_SECTORS * PCECD_SECTOR_SIZE)
+    for i in range(0, len(raw) - (PCECD_SECTOR_SIZE - 1), PCECD_SECTOR_SIZE):
+        sector = raw[i : i + PCECD_SECTOR_SIZE]
+        boot_payload += sector[PCECD_MODE1_PAYLOAD_OFFSET : PCECD_MODE1_PAYLOAD_OFFSET + PCECD_MODE1_PAYLOAD_SIZE]
+    boot96_sha1 = sha1(bytes(boot_payload)).hexdigest()
+    base_disc_id = sha1(('%s|%s' % (toc_sha1, boot96_sha1)).encode()).hexdigest()
+    return toc_sha1, boot96_sha1, base_disc_id
 
 # helper class to handle mounted discs / extracted images
 class MountedDisc:
@@ -1147,6 +1272,43 @@ def identify_neogeocd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb
                 out[k] = v
     return out
 
+# identify PC Engine CD / TurboGrafx-CD game
+def identify_pcecd(fn, db, user_uuid=None, user_volume_ID=None, prefer_gamedb=False):
+    if get_extension(fn) != 'cue':
+        error("PCECD identification currently requires a CUE file: %s" % fn)
+    if 'PCECD' not in db:
+        error("PCECD database not found. Rebuild db.pkl.gz with scripts/build_db.py after adding PCECD data.")
+
+    toc_sha1, boot96_sha1, base_disc_id = pcecd_hashes_from_cue(fn)
+    out = {
+        'toc_sha1': toc_sha1,
+        'boot96_sha1': boot96_sha1,
+        'base_disc_id': base_disc_id,
+    }
+
+    candidates = []
+    if 'base_disc_id' in db['PCECD'] and base_disc_id in db['PCECD']['base_disc_id']:
+        candidates = db['PCECD']['base_disc_id'][base_disc_id]
+    elif 'toc_boot' in db['PCECD'] and (toc_sha1, boot96_sha1) in db['PCECD']['toc_boot']:
+        candidates = db['PCECD']['toc_boot'][(toc_sha1, boot96_sha1)]
+
+    if len(candidates) == 0:
+        return out
+
+    if len(candidates) == 1:
+        gamedb_entry = candidates[0]
+        out['match_status'] = 'exact'
+    else:
+        gamedb_entry = candidates[0]
+        out['match_status'] = 'ambiguous'
+        out['candidate_count'] = str(len(candidates))
+        out['candidate_titles'] = ' | '.join(c.get('detected_title', c.get('cue_name', '')) for c in candidates)
+
+    for k,v in gamedb_entry.items():
+        if (k not in out) or prefer_gamedb:
+            out[k] = v
+    return out
+
 # dictionary storing all identify functions
 IDENTIFY = {
     'GB':        identify_gb_gbc,
@@ -1157,6 +1319,7 @@ IDENTIFY = {
     'N64':       identify_n64,
     'NeoGeoCD':  identify_neogeocd,
     'NES':       identify_nes,
+    'PCECD':     identify_pcecd,
     'PSP':       identify_psp,
     'PSX':       identify_psx,
     'PS2':       identify_ps2,

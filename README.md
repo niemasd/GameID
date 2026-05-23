@@ -9,6 +9,7 @@ Identify a game using [GameDB](https://github.com/niemasd/GameDB). Supported con
 * `N64` - Nintendo 64
 * `NeoGeoCD` - SNK Neo Geo CD
 * `NES` - Nintendo Entertainment System
+* `PCECD` - PC Engine CD / TurboGrafx-CD
 * `PS2` - Sony PlayStation 2
 * `PSP` - Sony PlayStation Portable
 * `PSX` - Sony PlayStation
@@ -54,6 +55,13 @@ find psx_games/ -type f -iname "*.cue" -o -iname "*.iso" | parallel --jobs 8 ./G
 ```bash
 rm -f db.pkl.gz && ./scripts/build_db.py db.pkl.gz
 ```
+
+### PCECD Database Source
+
+PCECD identification currently expects CUE/BIN-style images. It computes the
+same `toc_sha1` and `boot96_sha1` fields used by the GameDB PCECD index. Some
+same-layout Alt/Rev discs are intentionally reported as ambiguous candidates
+unless stronger collision-resolution data is added.
 
 ## Acknowledgements
 
